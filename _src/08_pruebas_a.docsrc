@@ -1,0 +1,332 @@
+@TITLE DocuPasion
+@SUB Documento de Pruebas (Estrategia, Casos y Evidencia)
+@SUB FASE 8 - PRUEBAS
+@AUTHOR Equipo de Ingeniería
+@DATE 11 de septiembre de 2026
+@PB
+@H1 Tabla de contenido
+@LI 1. Introducción
+@LI 2. Estrategia de pruebas
+@LI 3. Entorno de pruebas
+@LI 4. Casos de prueba - Backend API
+@LI 5. Casos de prueba - Motor RAG
+@LI 6. Casos de prueba - Frontend
+@LI 7. Casos de prueba - Seguridad
+@LI 8. Pruebas de regresión
+@LI 9. Cobertura de requisitos
+@LI 10. Criterios de aceptación
+@LI 11. Plan de ejecución
+@LI Conclusiones
+@LI Referencias
+@PB
+
+@H1 1. Introducción
+@H2 1.1 Propósito
+@P Este documento define la estrategia de pruebas del sistema DocuPasion, los casos de prueba por módulo, los criterios de aceptación y la evidencia esperada. Su objetivo es garantizar que el sistema cumple los 20 RF y 11 RNF definidos en la fase de análisis, y que los componentes interactúan correctamente entre sí. Las pruebas se clasifican en: unitarias (funciones individuales), integración (endpoints de la API) y funcionales (flujo completo del usuario).
+@H2 1.2 Alcance
+@P El alcance de las pruebas abarca: (a) los 16 endpoints de la API REST, (b) el motor RAG con aislamiento por usuario, (c) el frontend SPA (login, CRUD, chat, monitoreo, configuración), (d) la seguridad (autenticación, autorización, protección de datos). No se incluyen pruebas de rendimiento (load testing) ni pruebas de accesibilidad (WCAG), que se consideran alcance futuro.
+@PB
+
+@H1 2. Estrategia de pruebas
+@H2 2.1 Niveles de prueba
+@TABLE
+@HDR Nivel | Herramienta | Alcance | Estado
+@ROW Unitaria | pytest + fixtures en memoria | Funciones de servicios y utilidades | Pendiente (requiere Python)
+@ROW Integración | httpx + TestClient | Endpoints de la API contra BD en memoria | Pendiente (requiere Python)
+@ROW Funcional | Manual / Selenium | Flujo completo del usuario | Parcial (frontend mock verificable)
+@ROW Seguridad | Manual + manipulación de tokens | Auth, roles, aislamiento de datos | Pendiente (requiere Python)
+@ROW Regresión | Suite completa automatizada | Todos los módulos | Pendiente (requiere CI)
+@ENDT
+@H2 2.2 Criterios de selección de casos
+@P Los casos de prueba se seleccionaron priorizando: (1) módulos críticos (auth, upload, RAG), (2) componentes nuevos implementados en FASE 5 (repositories, monitoring, config), (3) requisitos de seguridad (RB-004, RNF-001, RNF-004). Se evita duplicar pruebas que cubre la validación automática de Pydantic (tipos, restricciones) y se enfoca en la lógica de negocio.
+@H2 2.3 Convenciones de identificación
+@P Cada caso de prueba se identifica con el patrón CU-nnn donde nnn es un número secuencial. Los requisitos asociados se listan entre paréntesis. Los resultados se registran como: PASA (P), FALLA (F), NO EJECUTABLE (NE) o PENDIENTE (PE).
+@PB
+
+@H1 3. Entorno de pruebas
+@H2 3.1 Configuración del entorno
+@TABLE
+@HDR Elemento | Valor | Nota
+@ROW Base de datos | SQLite en memoria (testing) | Evita contaminar la BD de desarrollo.
+@ROW Python | 3.10+ (requerido, no instalado actualmente) | Bloqueo para ejecución de pruebas.
+@ROW Dependencias | pip install -r requirements.txt | Todas las dependencias listadas con versiones fijas.
+@ROW Variables de entorno | .env.testing | SECRET_KEY=test_key, OPENAI_API_KEY=test_key, DATABASE_URL=sqlite:///testing.db.
+@ROW Servidor | uvicorn app.main:app --port 8001 | Puerto distinto al de desarrollo (8000).
+@ENDT
+@H2 3.2 Datos de prueba
+@P Los datos de prueba se generan dentro de cada fixture de pytest. La fixture create_test_user crea un usuario con email test@example.com y password Test123456. La fixture create_test_repository crea un repositorio de prueba. La fixture create_test_document crea un documento con archivo adjunto temporal. Todos los datos se limpian automáticamente al finalizar cada test (rollback de la sesión de SQLAlchemy).
+@H2 3.3 Precondiciones globales
+@LI El servidor debe estar detenido antes de iniciar la suite de pruebas.
+@LI La BD de testing.db no debe existir previamente.
+@LI La variable OPENAI_API_KEY puede ser un valor ficticio para tests que no dependan de la API real.
+@LI El frontend no se prueba con herramientas automatizadas en esta fase.
+@PB
+
+@H1 4. Casos de prueba - Backend API
+@H2 4.1 Módulo de autenticación (auth.py)
+@TABLE
+@HDR CU | Descripción | Requisito | Método | Resultado
+@ROW CU-001 | Registro exitoso de usuario nuevo | RF-001 | POST /api/auth/register | PE
+@ROW CU-002 | Rechazo de registro con email duplicado | RF-001 | POST /api/auth/register | PE
+@ROW CU-003 | Rechazo de registro con password corto (menos de 6 caracteres) | RNF-001 | POST /api/auth/register | PE
+@ROW CU-004 | Registro con role client ignorando role malicioso | RB-004 | POST /api/auth/register | PE
+@ROW CU-005 | Login exitoso con credenciales válidas | RF-001 | POST /api/auth/login | PE
+@ROW CU-006 | Rechazo de login con password incorrecto | RF-001 | POST /api/auth/login | PE
+@ROW CU-007 | Respuesta contiene access_token y token_type | RF-001 | POST /api/auth/login | PE
+@ROW CU-008 | Datos de usuario en respuesta no incluyen password_hash | RNF-001 | POST /api/auth/register | PE
+@ENDT
+@H2 4.2 Módulo de documentos (documents.py)
+@TABLE
+@HDR CU | Descripción | Requisito | Método | Resultado
+@ROW CU-009 | Upload de PDF exitoso | RF-003 | POST /api/documents/upload | PE
+@ROW CU-010 | Upload de DOCX exitoso | RF-003 | POST /api/documents/upload | PE
+@ROW CU-011 | Rechazo de archivo no permitido (ejemplo: .exe) | RNF-002 | POST /api/documents/upload | PE
+@ROW CU-012 | Nombre de archivo seguro con UUID | RF-019 | POST /api/documents/upload | PE
+@ROW CU-013 | Mapeo correcto de repository_id y category_id | RF-010 | POST /api/documents/upload | PE
+@ROW CU-014 | Extracción de texto de PDF (PyPDF2) | RF-003 | POST /api/documents/upload | PE
+@ROW CU-015 | Listado de documentos del usuario actual | RF-005 | GET /api/documents | PE
+@ROW CU-016 | Descarga de documento por ID | RF-006 | GET /api/documents/{id}/download | PE
+@ROW CU-017 | Eliminación de documento | RF-007 | DELETE /api/documents/{id} | PE
+@ROW CU-018 | Creación de AILog por cada operación | RF-014 | POST /api/documents/upload | PE
+@ROW CU-019 | Creación de ErrorLog en fallo de extracción | RF-016 | POST /api/documents/upload | PE
+@ROW CU-020 | Estadísticas expandidas (by_category, by_status, questions, time_saved) | RF-011 | GET /api/documents/stats | PE
+@ENDT
+@H2 4.3 Módulo de repositorios (repositories.py)
+@TABLE
+@HDR CU | Descripción | Requisito | Método | Resultado
+@ROW CU-021 | Creación de repositorio | RF-010 | POST /api/repositories | PE
+@ROW CU-022 | Listado de repositorios del usuario | RF-010 | GET /api/repositories | PE
+@ROW CU-023 | Obtención de repositorio por ID | RF-010 | GET /api/repositories/{id} | PE
+@ROW CU-024 | Actualización de repositorio | RF-010 | PUT /api/repositories/{id} | PE
+@ROW CU-025 | Eliminación de repositorio | RF-010 | DELETE /api/repositories/{id} | PE
+@ROW CU-026 | Error 409 si nombre duplicado en el mismo usuario | RF-010 | POST /api/repositories | PE
+@ROW CU-027 | Error 404 si repositorio no existe | RF-010 | GET /api/repositories/{id} | PE
+@ROW CU-028 | Repositorio solo visible para su propietario | RNF-004 | GET /api/repositories | PE
+@ENDT
+@H2 4.4 Módulo de IA (ai_chat.py)
+@TABLE
+@HDR CU | Descripción | Requisito | Método | Resultado
+@ROW CU-029 | Pregunta sin documentos retorna respuesta orientativa | RF-013 | POST /api/ai/ask | PE
+@ROW CU-030 | Pregunta con documentos retorna respuesta + fuentes | RF-013 | POST /api/ai/ask | PE
+@ROW CU-031 | Búsqueda semántica con threshold configurable | RF-014 | POST /api/ai/search | PE
+@ROW CU-032 | Búsqueda por keywords en nombre y tags | RF-015 | GET /api/ai/search | PE
+@ROW CU-033 | Respuesta vacía si documentos no contienen respuesta | RF-013 | POST /api/ai/ask | PE
+@ROW CU-034 | AILog registrado por cada pregunta | RF-014 | POST /api/ai/ask | PE
+@ROW CU-035 | Error 422 si pregunta vacía | RF-013 | POST /api/ai/ask | PE
+@ROW CU-036 | Aislamiento: usuario B no ve documentos de usuario A | RNF-004 | POST /api/ai/ask | PE
+@ENDT
+@H2 4.5 Módulo de monitoreo (monitoring.py)
+@TABLE
+@HDR CU | Descripción | Requisito | Método | Resultado
+@ROW CU-037 | Listado de logs de error (solo admin) | RF-016 | GET /api/monitoring/errors | PE
+@ROW CU-038 | Listado de logs de IA (solo admin) | RF-016 | GET /api/monitoring/ai-logs | PE
+@ROW CU-039 | Error 403 si usuario no admin accede a monitoring | RNF-005 | GET /api/monitoring/errors | PE
+@ROW CU-040 | Paginación de logs con limit y offset | RF-016 | GET /api/monitoring/errors | PE
+@ENDT
+@H2 4.6 Módulo de configuración (config.py)
+@TABLE
+@HDR CU | Descripción | Requisito | Método | Resultado
+@ROW CU-041 | Obtención de configuración actual (admin) | RF-020 | GET /api/config | PE
+@ROW CU-042 | Actualización de configuración (admin) | RF-020 | PUT /api/config | PE
+@ROW CU-043 | Configuración se persiste en tabla system_config | RF-020 | PUT /api/config | PE
+@ROW CU-044 | Error 403 si usuario no admin accede a config | RNF-005 | GET /api/config | PE
+@ROW CU-045 | Valores por defecto si tabla está vacía | RF-020 | GET /api/config | PE
+@ENDT
+@PB
+
+@H1 5. Casos de prueba - Motor RAG
+@H2 5.1 Indexación de documentos
+@TABLE
+@HDR CU | Descripción | Requisito | Método | Resultado
+@ROW CU-046 | Chunking respeta chunk_size configurado | RF-012 | Upload + Verificación | PE
+@ROW CU-047 | Chunking respeta chunk_overlap configurado | RF-012 | Upload + Verificación | PE
+@ROW CU-048 | owner_id asignado a cada chunk | RNF-004 | Verificación manual | PE
+@ROW CU-049 | Archivo no indexable genera ErrorLog | RF-016 | Upload archivo corrupto | PE
+@ROW CU-050 | Índice se actualiza al eliminar documento | RF-007 | Delete + Búsqueda | PE
+@ENDT
+@H2 5.2 Búsqueda y respuesta
+@TABLE
+@HDR CU | Descripción | Requisito | Método | Resultado
+@ROW CU-051 | Búsqueda semántica solo retorna chunks del mismo usuario | RNF-004 | Búsqueda con 2 usuarios | PE
+@ROW CU-052 | Búsqueda por keywords retorna coincidencias en tags | RF-015 | GET /api/ai/search | PE
+@ROW CU-053 | Respuesta del LLM incluye fuentes documentales | RF-013 | POST /api/ai/ask | PE
+@ROW CU-054 | Respuesta orientativa cuando no hay documentos | RF-013 | POST /api/ai/ask (sin docs) | PE
+@ROW CU-055 | Fallback simulado si API key no está configurada | RNF-003 | POST /api/ai/ask (sin key) | PE
+@ENDT
+@PB
+
+@H1 6. Casos de prueba - Frontend
+@H2 6.1 Autenticación
+@TABLE
+@HDR CU | Descripción | Método | Resultado
+@ROW CU-056 | Login exitoso muestra dashboard | Click Login | PE
+@ROW CU-057 | Login fallido muestra error | Click Login (credenciales mal) | PE
+@ROW CU-058 | Registro exitoso muestra login | Click Register | PE
+@ROW CU-059 | Cierre de sesión limpia token | Click Logout | PE
+@ENDT
+@H2 6.2 Gestión de repositorios
+@TABLE
+@HDR CU | Descripción | Método | Resultado
+@ROW CU-060 | Crear repositorio nuevo | Click + New Repository | PE
+@ROW CU-061 | Editar nombre de repositorio | Click Edit | PE
+@ROW CU-062 | Eliminar repositorio | Click Delete | PE
+@ROW CU-063 | Lista solo muestra repositorios del usuario | Verificación visual | PE
+@ENDT
+@H2 6.3 Gestión de documentos
+@TABLE
+@HDR CU | Descripción | Método | Resultado
+@ROW CU-064 | Upload de archivo por drag and drop | Drag file to area | PE
+@ROW CU-065 | Upload de archivo por botón | Click Upload button | PE
+@ROW CU-066 | Listado muestra nombre, tipo y estado | Verificación visual | PE
+@ROW CU-067 | Click en documento abre visor PDF | Click document row | PE
+@ROW CU-068 | Eliminar documento | Click Delete | PE
+@ROW CU-069 | Filtrado por repository y category | Select filters | PE
+@ENDT
+@H2 6.4 Chat IA
+@TABLE
+@HDR CU | Descripción | Método | Resultado
+@ROW CU-070 | Enviar pregunta y recibir respuesta | Type + Send | PE
+@ROW CU-071 | Fuentes aparecen en la respuesta | Verificación visual | PE
+@ROW CU-072 | Respuesta orientativa sin documentos | Send (no docs) | PE
+@ENDT
+@H2 6.5 Monitoreo y configuración
+@TABLE
+@HDR CU | Descripción | Método | Resultado
+@ROW CU-073 | Admin ve logs de error | Click Monitoring | PE
+@ROW CU-074 | Admin ve logs de IA | Click Monitoring | PE
+@ROW CU-075 | Admin edita configuración del sistema | Click Config | PE
+@ROW CU-076 | No-admin no ve secciones de admin | Verificación visual | PE
+@ENDT
+@PB
+
+@H1 7. Casos de prueba - Seguridad
+@H2 7.1 Autenticación y autorización
+@TABLE
+@HDR CU | Descripción | Requisito | Resultado
+@ROW CU-077 | Endpoint protegido sin token retorna 401 | RNF-001 | PE
+@ROW CU-078 | Endpoint admin sin rol admin retorna 403 | RNF-005 | PE
+@ROW CU-079 | Token expirado retorna 401 | RNF-001 | PE
+@ROW CU-080 | Token con email inexistente retorna 401 | RNF-001 | PE
+@ROW CU-081 | Password hasheado con bcrypt (no texto plano) | RNF-001 | PE
+@ROW CU-082 | Registro con role malicioso siempre asigna client | RB-004 | PE
+@ENDT
+@H2 7.2 Aislamiento de datos
+@TABLE
+@HDR CU | Descripción | Requisito | Resultado
+@ROW CU-083 | Usuario A no ve documentos de usuario B | RNF-004 | PE
+@ROW CU-084 | Usuario A no ve repositorios de usuario B | RNF-004 | PE
+@ROW CU-085 | RAG no retorna chunks de otros usuarios | RNF-004 | PE
+@ROW CU-086 | Admin no puede ver password_hash de usuarios | RNF-001 | PE
+@ENDT
+@H2 7.3 Seguridad de archivos
+@TABLE
+@HDR CU | Descripción | Requisito | Resultado
+@ROW CU-087 | Archivos guardados con nombre UUID (no original) | RF-019 | PE
+@ROW CU-088 | Extensión no válida rechazada | RNF-002 | PE
+@ROW CU-089 | Archivo muy grande rechazado (más de 10MB) | RNF-002 | PE
+@ROW CU-090 | Ruta de archivo no expuesta en API | RF-019 | PE
+@ENDT
+@PB
+
+@H1 8. Pruebas de regresión
+@H2 8.1 Procedimiento
+@P Las pruebas de regresión se ejecutan después de cada cambio significativo en el código. La suite completa se ejecuta con el comando: pytest tests/ -v --tb=short. El criterio de regresión es: todos los CU anteriores deben mantener su resultado PASA; cualquier cambio a FALLA bloquea la entrega.
+@H2 8.2 Cobertura mínima esperada
+@TABLE
+@HDR Módulo | Mínimo de tests | Justificación
+@ROW auth.py | 8 tests | Módulo crítico de seguridad.
+@ROW documents.py | 12 tests | CRUD completo + pipeline IA.
+@ROW repositories.py | 8 tests | CRUD + validación de duplicados.
+@ROW ai_chat.py | 8 tests | RAG + aislamiento de usuarios.
+@ROW monitoring.py | 4 tests | Solo admin, logs.
+@ROW config.py | 5 tests | Solo admin, persistencia.
+@ROW rag_engine.py | 5 tests | Chunking + búsqueda.
+@ROW services/config_service.py | 3 tests | Merge DB + defaults.
+@ROW TOTAL | 53 tests mínimo | Cobertura crítica del sistema.
+@ENDT
+@PB
+
+@H1 9. Cobertura de requisitos
+@H2 9.1 Matriz RF vs Pruebas
+@TABLE
+@HDR RF | Descripción | CU asociados | Cobertura
+@ROW RF-001 Autenticación | CU-001 a CU-008, CU-056 a CU-059, CU-077 a CU-082 | Completa
+@ROW RF-002 Registro | CU-001 a CU-004 | Completa
+@ROW RF-003 Carga de documentos | CU-009 a CU-014, CU-064 a CU-069 | Completa
+@ROW RF-004 Eliminación de documentos | CU-017 | Completa
+@ROW RF-005 Listado | CU-015, CU-022 | Completa
+@ROW RF-006 Descarga | CU-016 | Completa
+@ROW RF-007 Eliminación | CU-017, CU-050 | Completa
+@ROW RF-008 Visualización | CU-067 | Completa
+@ROW RF-010 Repositorios | CU-021 a CU-028 | Completa
+@ROW RF-011 Estadísticas | CU-020 | Completa
+@ROW RF-012 Chunking | CU-046, CU-047 | Completa
+@ROW RF-013 RAG | CU-029, CU-030, CU-033, CU-035, CU-053, CU-054 | Completa
+@ROW RF-014 Búsqueda semántica | CU-031, CU-034, CU-048 | Completa
+@ROW RF-015 Búsqueda keywords | CU-032, CU-052 | Completa
+@ROW RF-016 Errores y logs | CU-019, CU-037 a CU-040, CU-049 | Completa
+@ROW RF-017 Sesiones | JWT manejado vía CU-005, CU-007, CU-079 | Completa
+@ROW RF-018 Configuración | CU-041 a CU-045 | Completa
+@ROW RF-019 Seguridad de archivos | CU-012, CU-087, CU-090 | Completa
+@ROW RF-020 Config admin | CU-041 a CU-045, CU-075 | Completa
+@ENDT
+@H2 9.2 Matriz RNF vs Pruebas
+@TABLE
+@HDR RNF | Descripción | CU asociados | Cobertura
+@ROW RNF-001 Seguridad passwords | CU-003, CU-008, CU-081, CU-086 | Completa
+@ROW RNF-002 Validación archivos | CU-011, CU-088, CU-089 | Completa
+@ROW RNF-003 Simulación IA | CU-055 | Completa
+@ROW RNF-004 Aislamiento usuarios | CU-028, CU-036, CU-048, CU-051, CU-083 a CU-085 | Completa
+@ROW RNF-005 Roles y permisos | CU-039, CU-044, CU-078, CU-076 | Completa
+@ROW RNF-009 Migración BD | Verificable al cambiar DATABASE_URL | Pendiente
+@ROW RNF-010 Rendimiento | No cubierto en esta fase | Pendiente
+@ENDT
+@PB
+
+@H1 10. Criterios de aceptación
+@H2 10.1 Criterios de éxito
+@LI Todos los CU marcados como PASA en la ejecución final.
+@LI Ningún CU crítico (seguridad, aislamiento) marcado como FALLA.
+@LI Cobertura mínima de 53 tests unitarios/integración.
+@LI Ausencia de errores 500 en cualquier endpoint.
+@LI Frontend funcional: login, CRUD y chat operativos sin errores en consola.
+@H2 10.2 Criterios de rechazo
+@LI Cualquier CU de seguridad (CU-077 a CU-090) en FALLA.
+@LI RAG retorna documentos de otro usuario (CU-085 en FALLA).
+@LI Password en texto plano en la BD o en la respuesta API.
+@LI Errores no manejados que produzcan 500 en la API.
+@H2 10.3 Criterios de suspensión
+@LI Python no instalado: la ejecución automatizada queda como PENDIENTE.
+@LI API key de OpenAI no configurada: tests de RAG con LLM quedan como NE (no ejecutables).
+@LI Frontend no utilizable sin backend: las pruebas funcionales del frontend quedan como NE.
+@PB
+
+@H1 11. Plan de ejecución
+@H2 11.1 Secuencia de ejecución
+@LI Paso 1: Instalar Python 3.10+ y crear entorno virtual (python -m venv venv).
+@LI Paso 2: Instalar dependencias (pip install -r requirements.txt).
+@LI Paso 3: Configurar .env.testing con valores de prueba.
+@LI Paso 4: Ejecutar suite de pruebas unitarias (pytest tests/unit/ -v).
+@LI Paso 5: Ejecutar suite de pruebas de integración (pytest tests/integration/ -v).
+@LI Paso 6: Levantar servidor de pruebas (uvicorn app.main:app --port 8001).
+@LI Paso 7: Ejecutar pruebas manuales del frontend (abrir navegador, seguir CU-056 a CU-076).
+@LI Paso 8: Registrar resultados en la tabla de evidencia (sección 11.2).
+@H2 11.2 Tabla de evidencia
+@P Los resultados de cada ejecución se registran en esta tabla. Los campos se completan durante la ejecución real.
+@TABLE
+@HDR Fecha | CU | Resultado | Observación
+@ROW PENDIENTE | Todos | PE | Ejecución pendiente (Python no instalado)
+@ENDT
+@PB
+
+@H1 Conclusiones
+@P Este documento define 90 casos de prueba distribuidos en 6 módulos (auth, documents, repositories, ai_chat, monitoring, config), motor RAG, frontend y seguridad. La cobertura de requisitos es completa para los 20 RF y 7 de 11 RNF (los 4 restantes se verifican en fases posteriores o requieren entorno de producción). El criterio mínimo de éxito es 53 tests automatizados con todos los CU de seguridad en PASA. La limitación principal es la ausencia de Python en el entorno actual, que deja todos los resultados como PENDIENTE.
+@PB
+
+@H1 Referencias
+@LI pytest Documentation - docs.pytest.org
+@LI FastAPI Testing - fastapi.tiangolo.com/tutorial/testing
+@LI httpx Documentation - www.python-httpx.org
+@LI OWASP Testing Guide - owasp.org/www-project-web-security-testing-guide
+@LI ISO/IEC/IEEE 29119 Software Testing - standards.iso.org
+@LI Análisis de Requisitos DocuPasion - 01_Analisis/01_Analisis_Requisitos.doc

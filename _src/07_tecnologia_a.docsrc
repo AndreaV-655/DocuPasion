@@ -1,0 +1,81 @@
+@TITLE DocuPasion
+@SUB Documento de Tecnología (Gestión, Experimentación y Recursos)
+@SUB FASE 7 - TECNOLOGÍA
+@AUTHOR Equipo de Ingeniería
+@DATE 11 de septiembre de 2026
+@PB
+@H1 Tabla de contenido
+@LI 1. Introducción
+@LI 2. Plan de documentación del sistema
+@LI 3. Gestión del código fuente
+@LI 4. Experimentación con técnicas de programación
+@LI 5. Integración continua y automatización
+@LI 6. Administración del proyecto
+@LI 7. Recursos del proyecto
+@LI 8. Evaluación de riesgos del proyecto
+@LI Conclusiones
+@LI Referencias
+@PB
+
+@H1 1. Introducción
+@H2 1.1 Propósito del documento
+@P Este documento describe las prácticas de ingeniería de software aplicadas al proyecto DocuPasion: plan de documentación, gestión del código fuente, técnicas de programación experimentadas, integración continua, administración del proyecto por fases, recursos necesarios y evaluación de riesgos. Su objetivo es servir como respaldo técnico y administrativo para la entrega académica, y como guía para la mantenibilidad y escalabilidad del sistema.
+@H2 1.2 Contexto
+@P DocuPasion es un sistema de gestión documental con inteligencia artificial, construido con una arquitectura por capas (FastAPI, SQLAlchemy, SQLite, SPA nativa en HTML/CSS/JS). El proyecto se desarrolla bajo un enfoque de fases documentadas (01-13), con entrega de código fuente, pruebas y documentación en cada etapa. Este documento formaliza las prácticas de ingeniería que dan soporte a ese proceso.
+@PB
+
+@H1 2. Plan de documentación del sistema
+@H2 2.1 Política de documentación
+@P Toda la documentación del sistema se genera en formato .doc (RTF base, compatible con Word) a partir de fuentes editables en _src/ con formato .docsrc. El generador _src/tools/generate_doc.ps1 produce el .doc final, lo que garantiza consistencia visual entre todas las fases y evita la edición directa de documentos RTF.
+@H2 2.2 Estructura de carpetas de entrega
+@TABLE
+@HDR Carpeta | Contenido | Formato
+@ROW 01_Analisis/ | Documento de Análisis (secciones 8.1-8.17) | .doc + fuente .docsrc
+@ROW 02_Diseno/ | Documento de Diseño (secciones 9.1-9.19) | .doc + fuente .docsrc
+@ROW 06_Codigo_Fuente/ | Descripción del código y trazabilidad | .doc + fuente .docsrc
+@ROW 07_Tecnologia/ | Este documento | .doc + fuente .docsrc
+@ROW 09_Codigo_Fuente/ | Código fuente completo (backend + frontend) | .py, .js, .css, .html
+@ROW _src/ | Fuentes de documentos y herramientas de generación | .docsrc + .ps1
+@ROW _src/tools/ | generate_doc.ps1 (generador de .doc) | PowerShell
+@ROW _src/tests/ | Pruebas del generador de documentos | .docsrc + .doc
+@ENDT
+@H2 2.3 Generador de documentos
+@P El generador _src/tools/generate_doc.ps1 acepta los parámetros -Sources (lista de archivos .docsrc), -Output (ruta del .doc de salida) y -HeaderText (texto del encabezado). Soporta marcado propio: título, subtítulo, autor, fecha, encabezados H1-H3, párrafos, negrita, listas, tablas con cabecera, preformateado, salto de página y espaciado. Los caracteres no ASCII se convierten a secuencias Unicode RTF automáticamente, lo que permite el uso correcto de tildes, eñes y otros símbolos del español.
+@H2 2.4 Revisión y aprobación
+@P Cada fase documentada se somete a revisión de consistencia interna antes de generar el .doc final. Las revisiones verifican: secciones completas (sin saltos vacíos), tablas con número consistente de columnas, ausencia de tags de marcado no soportados y cierre correcto del RTF. Los resultados se validan con las pruebas de estructura (conteo de H1, filas de tabla, ausencia de marcado residual) ejecutadas después de cada generación.
+@PB
+
+@H1 3. Gestión del código fuente
+@H2 3.1 Repositorio y control de versiones
+@P El código se almacena en un repositorio Git. El archivo .gitignore excluye los archivos sensibles (.env, docupasion.db, uploads/, __pycache__) y los generados (*.doc, _src/tests/*.doc). El repositorio distingue entre código fuente fuerte (backend/, frontend/) y código documental generado (las carpetas 01_Analisis/ a 13_Presentacion/ solo contienen .doc y .docsrc).
+@H2 3.2 Convenciones de commits
+@P Los commits siguen un formato descriptivo: verbo en infinitivo + alcance + descripción. Ejemplos:
+@LI feat(models): crear Repository, Category, DocumentExtraction y ErrorLog
+@LI fix(deps): corregir comparación de rol admin con UserRole.ADMIN
+@LI fix(auth): eliminar campo role del registro público (RB-004)
+@LI feat(frontend): integrar SPA funcional con API backend
+@LI docs(fase6): generar 06_Codigo_Fuente.doc
+@H2 3.3 Ramas
+@P El trabajo se organiza en la rama main como línea base estable. Las funcionalidades nuevas se desarrollan en ramas feature/ (feat/repo-crud, feat/rag-scoping, feat/frontend-integration). Los fixes se aplican directamente a main con commits descriptivos. Las ramas se eliminan tras su merge.
+@H2 3.4 Archivos sensibles
+@P El archivo .env contiene las credenciales de la aplicación y nunca se incluye en el repositorio. En su lugar se distribuye .env.example con valores placeholder. El archivo .gitignore del backend excluye: .env, docupasion.db, uploads/, __pycache__/, *.pyc, .idea/, .vscode/.
+@PB
+
+@H1 4. Experimentación con técnicas de programación
+@H2 4.1 Inyección de dependencias (Dependency Injection)
+@P FastAPI implementa inyección de dependencias de forma nativa a través de Depends(). En DocuPasion se usan tres dependencias fundamentales: get_db (proporciona la sesión de SQLAlchemy), get_current_user (valida el token JWT y devuelve el usuario) y get_current_admin (valida el rol). Esta técnica permite: aislar la lógica de autenticación del negocio, reutilizar validaciones en múltiples endpoints y facilitar las pruebas al inyectar sesiones de prueba.
+@H2 4.2 Patrón Repositorio implícito (vía SQLAlchemy ORM)
+@P Aunque no se implementa un patrón Repository formal con clases dedicadas, SQLAlchemy actúa como capa de acceso a datos encapsulada. Las consultas se realizan sobre los modelos declarativos (Document, Repository, Category), lo que aísla la API del esquema físico de la BD. Esto cumple el requisito RNF-009 (migración de SQLite a PostgreSQL sin cambios en la lógica de negocio) porque solo es necesario cambiar la URL de conexión en settings.DATABASE_URL.
+@H2 4.3 Programación asíncrona (async/await)
+@P El endpoint de upload en documents.py se declara async def upload_document(...), lo que permite usar await file.read() y await file.seek(0) para manejar archivos sin bloquear el event loop. Los endpoints restantes son síncronos (def), ya que las operaciones de base de datos son bloqueantes por naturaleza. La documentación de FastAPI indica que no se debe mezclar async y sync en el mismo request para evitar bloqueos; por ello, el pipeline de IA se ejecuta en el mismo request síncrono de upload, marcando el documento como processing antes de la extracción y actualizándolo después.
+@H2 4.4 Validación con Pydantic
+@P Todos los cuerpos de solicitud se validan con modelos Pydantic (UserRegister, RepositoryCreate, ChatRequest, ConfigUpdate). Pydantic aplica validación automática de tipos, restricciones (Field(min_length=6, max_length=128)), y convierte los datos a tipos Python seguros antes de que lleguen a la lógica de negocio. La configuración del sistema usa BaseModel para distinguir entre campos requeridos y opcionales con valores por defecto.
+@H2 4.5 Hashing de contraseñas con bcrypt
+@P Las contraseñas se almacenan con bcrypt (costo por defecto: 12 rounds). La función hash_password() genera el hash y verify_password() lo compara. Este es el mecanismo estándar para autenticación segura (RNF-001); el hash de bcrypt es resistente a ataques de fuerza bruta y rainbow tables porque incorpora un salt aleatorio por contraseña.
+@H2 4.6 Tokens JWT para sesiones sin estado
+@P La sesión se mantiene con tokens JWT firmados con la clave SECRET_KEY del entorno. El payload contiene el email del usuario (campo sub) y una fecha de expiración configurable (por defecto 24 horas). Las solicitudes autenticadas incluyen la cabecera Authorization: Bearer {token}, que la dependencia get_current_user decodifica y valida en cada request. Esta aproximación es preferible a sesiones en la base de datos porque: no requiere estado en el servidor, funciona con cualquier cantidad de instancias y se integra de forma nativa con el cliente (fetch con headers).
+@H2 4.7 Motor RAG con aislamiento por usuario
+@P La implementación original del motor RAG indexaba y buscaba documentos de todos los usuarios en el mismo espacio vectorial. La versión actual almacena owner_id en cada chunk del índice y filtra por owner_id en cada operación de búsqueda (search, keyword_search, answer). Esta técnica cumple RNF-004 (aislamiento entre usuarios) y RF-014/RF-015 (búsqueda y RAG), y se logra con un costo mínimo: un campo adicional por chunk y un filtro condicional en cada recorrido del índice.
+@H2 4.8 Gestión de configuración por tabla (SystemConfig)
+@P Para cumplir RF-020 (configuración del sistema por el administrador), se implementó una tabla system_config con pares llave-valor que complementan las variables de entorno. El servicio ConfigService.get() busca primero en la tabla y luego en los valores por defecto (Settings). Esta técnica permite al administrador cambiar parámetros en tiempo de ejecución (chunk_size, chunk_overlap, llm_model) sin reiniciar el servidor, y persistirlos entre sesiones. La desventaja es que el motor de embeddings en memoria no recarga los parámetros automáticamente; los nuevos valores se aplican a los documentos cargados después del cambio.
+@PB

@@ -1,0 +1,25 @@
+\rtf1\ansi\ansicpg1252\deff0
+{\fonttbl{\f0\froman\fcharset0 Times New Roman;}{\f1\fswiss\fcharset0 Arial;}{\f2\fmodern\fcharset0 Courier New;}}
+{\colortbl ;\red0\green0\blue0;}
+\paperw11906\paperh16838\margl1134\margr1134\margt1134\margb1134
+\widowctrl
+{\footer\pard\qr\fs18 P\u225?gina \chpgn\par}
+{\header\pard\ql\fs16\i DocuPasion \u8212? Prueba de generaci\u243?n\i0\par}
+\viewkind4\uc1\pard\sectd
+\pard\sb2000\qc\f1\fs58\b DocuPasion\b0\fs58\par
+\pard\qc\f1\fs32 Sistema de prueba del generador\par
+\pard\qc\fs24 Equipo DocuPasion\par
+\pard\qc\fs24 Septiembre 2026\par
+\page\par
+\pard\sb360\sa180\f0\fs32\b 1. Prueba de Encabezado\b0\par
+\pard\sb60\sa120\fi360\sl288\slmult1 Este es un p\u225?rrafo de prueba con acentos: \u225? \u233? \u237? \u243? \u250? \u241?, y signos: ?i!()/%.\par
+\pard\sb240\sa120\f0\fs28\b 1.1 Tabla de prueba\b0\par\par\sb60\sa60\trowd\trgaph70\trleft0\clshdng3000\clbrdrt\brdrs\brdrw10\clbrdrl\brdrs\brdrw10\clbrdrb\brdrs\brdrw10\clbrdrr\brdrs\brdrw10\clvertalc\cellx1594\clshdng3000\clbrdrt\brdrs\brdrw10\clbrdrl\brdrs\brdrw10\clbrdrb\brdrs\brdrw10\clbrdrr\brdrs\brdrw10\clvertalc\cellx4433\clshdng3000\clbrdrt\brdrs\brdrw10\clbrdrl\brdrs\brdrw10\clbrdrb\brdrs\brdrw10\clbrdrr\brdrs\brdrw10\clvertalc\cellx9638 \pard\intbl\b\qc\fs18 ID\b\cell \intbl\b\qc\fs18 Nombre\b\cell \intbl\b\qc\fs18 Descripci\u243?n\b\cell \row\trowd\trgaph70\trleft0\clbrdrt\brdrs\brdrw10\clbrdrl\brdrs\brdrw10\clbrdrb\brdrs\brdrw10\clbrdrr\brdrs\brdrw10\clvertalc\cellx1594\clbrdrt\brdrs\brdrw10\clbrdrl\brdrs\brdrw10\clbrdrb\brdrs\brdrw10\clbrdrr\brdrs\brdrw10\clvertalc\cellx4433\clbrdrt\brdrs\brdrw10\clbrdrl\brdrs\brdrw10\clbrdrb\brdrs\brdrw10\clbrdrr\brdrs\brdrw10\clvertalc\cellx9638 \pard\intbl\ql\fs18 RF-001\cell \intbl\ql\fs18 Autenticaci\u243?n\cell \intbl\ql\fs18 Registro y login de usuarios con JWT\cell \row\trowd\trgaph70\trleft0\clbrdrt\brdrs\brdrw10\clbrdrl\brdrs\brdrw10\clbrdrb\brdrs\brdrw10\clbrdrr\brdrs\brdrw10\clvertalc\cellx1594\clbrdrt\brdrs\brdrw10\clbrdrl\brdrs\brdrw10\clbrdrb\brdrs\brdrw10\clbrdrr\brdrs\brdrw10\clvertalc\cellx4433\clbrdrt\brdrs\brdrw10\clbrdrl\brdrs\brdrw10\clbrdrb\brdrs\brdrw10\clbrdrr\brdrs\brdrw10\clvertalc\cellx9638 \pard\intbl\ql\fs18 RF-002\cell \intbl\ql\fs18 Documentos\cell \intbl\ql\fs18 Carga y consulta de archivos PDF, DOCX y TXT\cell \row\par\sb120
+\pard\sb40\sa80\li480\fi-240\sl264\slmult1\u8226? Elemento de lista uno\par
+\pard\sb40\sa80\li480\fi-240\sl264\slmult1\u8226? Elemento de lista dos\par
+\pard\ql\par
+{\f2\fs18 Documento -> Validaci\u243?n -> Extracci\u243?n -> Clasificaci\u243?n -> Resumen}\par
+\sb120
+\page\par
+\pard\sb200\sa100\f0\fs24\b 1.2 Conclusi\u243?n\b0\par
+\pard\sb60\sa120\sl288\slmult1\b Texto importante en negrita.\b0\par
+}

@@ -1,0 +1,159 @@
+@PB
+@H1 9.15 Diseño de interfaces
+@P Las pantallas se describen con su propósito, elementos y comportamiento. El diseño visual definitivo (colores, tipografías, logotipo) se define en la FASE 7 (UI/UX); aquí se fija la estructura funcional de cada vista, y el prototipo de alta fidelidad se entregará con imágenes de referencia en esa fase.
+@B 1. Login y Registro
+@LI Campos: email, contraseña; confirmación de registro incluye contraseña repetida.
+@LI Comportamiento: al iniciar sesión se guarda el token y se redirige al Dashboard; errores de validación se muestran en línea.
+@LI Relación: CU-001, CU-002, RF-001.
+@B 2. Dashboard
+@LI Indicadores: total de documentos, procesados con IA, preguntas respondidas, tiempo estimado ahorrado, distribución por categoría y por estado (RF-016).
+@LI Comportamiento: datos obtenidos de GET /api/documents/stats/summary al cargar la vista.
+@LI Relación: CU-013, RF-016.
+@B 3. Repositorios
+@LI Elementos: lista de repositorios con conteo de documentos; acciones crear, renombrar y eliminar (con confirmación).
+@LI Comportamiento: al seleccionar un repositorio se navega al listado de documentos filtrado por él.
+@LI Relación: CU-004, CU-005, RF-003, RF-004.
+@B 4. Documentos (listado)
+@LI Elementos: tabla con nombre, repositorio, categoría, estado (insignia), fecha y acciones (ver, descargar, eliminar).
+@LI Filtros: por repositorio, categoría, estado y búsqueda por nombre.
+@LI Comportamiento: al cargar la vista se obtiene GET /api/documents/ con los filtros activos; los cambios de estado se reflejan al actualizar.
+@LI Relación: CU-006, CU-007, RF-005, RF-006, RF-018.
+@B 5. Detalle del documento
+@LI Elementos: metadatos, categoría, estado, resumen, información extraída y botón de descarga; visor integrado del PDF con pdf.js.
+@LI Comportamiento: obtiene GET /api/documents/{id}; la información extraída se agrupa por tipo de documento.
+@LI Relación: CU-007, CU-008, RF-006, RF-007, RF-019.
+@B 6. Chat RAG
+@LI Elementos: historial de preguntas y respuestas, entrada de texto y lista de fuentes con fragmento por cada respuesta.
+@LI Comportamiento: POST /api/chat/; muestra el modo de generación (demo o llm); las fuentes se citan como enlaces al detalle.
+@LI Relación: CU-012, RF-015.
+@B 7. Monitoreo (administrador)
+@LI Elementos: tabla de estados de documentos, cola de procesamiento y registros de errores y de IA.
+@LI Comportamiento: GET /api/monitoring/logs y GET /api/monitoring/ai-logs; filtro por estado.
+@LI Relación: CU-014, RF-017, RF-018.
+@B 8. Configuración (administrador)
+@LI Elementos: modelo de generación, tamaño de chunk y solapamiento; clave de API (solo escritura, nunca se muestra).
+@LI Comportamiento: GET y PUT /api/config.
+@LI Relación: CU-015, RF-020.
+@PB
+
+@H1 9.16 Flujo documental
+@P Se describe el ciclo de vida completo de un documento desde su carga hasta su consulta y eliminación, especificando estados, acciones y responsables.
+@PRE
+                          Carga en repositorio
+                                    |
+                                    v
+                          [processing: validar extension y tamano]
+                                    |       | (rechazo RB-001/RB-002 400)
+                                    v       +----> fin (sin registro)
+                          [processing: guardar archivo y crear registro]
+                                    |
+                                    v
+                  +-----------------+------------------+
+                  |   Pipeline de IA (CU-010)          |
+                  | 1. pdf_parser: extraer texto       |
+                  | 2. analyzer: clasificar + resumir  |
+                  | 3. extractor: informacion relevante|
+                  | 4. embedding: chunks + embeddings  |
+                  +-----------------+------------------+
+                         |                      |
+                     (texto nulo)          (proceso correcto)
+                         |                      |
+                         v                      v
+                  [failed: AILog +      [indexed: categorias, resumen,
+                   ErrorLog]             informacion, indice actualizado]
+                                                    |
+                         consulta                   v
+                  +-------------------------+  [busqueda y RAG:
+                  | GET /api/documents/{id} |   respuesta con fuentes]
+                  | GET /chat/search        |
+                  | POST /api/chat/         |
+                  +-------------------------+
+                                                    |
+                                                    v
+                                          [DELETE /api/documents/{id}:
+                                           borra archivo e indice]
+                                                    |
+                                                    v
+                                         [registro eliminado]
+@ENDPRE
+@B Estados y transiciones válidas:
+@LI processing -> indexed (procesamiento correcto).
+@LI processing -> failed (sin texto o error del pipeline; excepción registrada).
+@LI indexed -> eliminado (acción del propietario).
+@LI failed -> eliminado (acción del propietario; el reprocesamiento es una mejora futura).
+@P Este flujo satisface RB-005, RB-006 y RB-010, y da servicio a los requisitos RF-005 a RF-019.
+@PB
+
+@H1 9.17 Integración con IA
+@B Modelo de integración:
+@LI Modo local (por defecto, sin API key). Clasificación por reglas, resumen por extracción de fragmentos significativos, recuperación por similitud de bloques sobre hashing de palabras normalizadas y generación de respuesta a partir de los fragmentos recuperados. No hay costo y no abandona el entorno.
+@LI Modo LLM (opcional, si se configura OPENAI_API_KEY). El motor RAG envía a OpenAI (modelo configurable gpt-4o-mini o similar) los top-5 fragmentos recuperados y la pregunta, y devuelve la respuesta con citas. El contenido enviado fuera del equipo se limita a lo necesario para responder (RB-008).
+@B Control de datos y privacidad:
+@LI El texto extraído y los chunks se almacenan localmente (SQLite y memoria).
+@LI La integración con OpenAI es opcional y desactivada por defecto; su activación requiere clave explícita del administrador (RNF-012, RB-008).
+@LI Los tokens y tiempos de cada operación se registran en AILog (RF-017) para informe de costos.
+@B Gestión de contexto:
+@LI Los parámetros chunk_size y overlap (por defecto 512 y 64) son configurables por el administrador (RF-020).
+@LI La evidencia se limita a los top-5 fragmentos relevantes; si el umbral de similitud no se alcanza, el sistema informa que no encontró respuesta.
+@B Límites de funcionamiento:
+@LI Sin OCR: los PDF escaneados sin capa de texto pasan a failed (R-05 mitigado, ver 8.16).
+@LI La clasificación por reglas puede fallar en documentos ambiguos; el umbral y la categoría "general" lo mitigan (R-08).
+@PB
+
+@H1 9.18 Seguridad
+@B Autenticación y contraseñas:
+@LI Las contraseñas se cifran con bcrypt (costo por defecto 12) antes de almacenarse (RNF-001).
+@LI Las sesiones usan tokens JWT firmados con secreto de entorno y tiempo de expiración configurable (RNF-002).
+@B Autorización:
+@LI Cada endpoint valida el token y, cuando corresponde, el rol del usuario (dep de FastAPI en deps.py).
+@LI La propiedad de repositorios y documentos se verifica en cada operación con el owner_id (RNF-004, RB-003).
+@LI Los endpoints de monitoreo (CU-014) y configuración (CU-015) requieren rol administrador (RF-002).
+@B Protección de datos y secretos:
+@LI La clave de API de OpenAI y el secreto JWT se cargan desde .env y nunca se publican ni se devuelven por la API (RNF-003; .gitignore ya excluye .env).
+@LI Los archivos se guardan con nombres seguros generados y nunca expuestos en URLs directas (descarga controlada por la API).
+@B Validación y saneamiento:
+@LI Validación de entrada con esquemas (Pydantic) y validación efectiva de extensiones y tamaños.
+@LI Saneamiento de nombres y control del tipo de archivo; límites en texto extraído para evitar abuso de memoria.
+@B Manejo de errores:
+@LI Respuestas de error con códigos y mensajes genéricos seguros; los detalles técnicos se registran en ErrorLog (RNF-011).
+@LI CORS restringido a orígenes permitidos por configuración.
+@PB
+
+@H1 9.19 Decisiones tecnológicas
+@P Se consolidan las decisiones con su motivación, alternativa descartada y ventaja, incluyendo las decisiones D-01 a D-04 del análisis.
+@TABLE
+@HDR Ámbito | Decisión | Motivo | Alternativa descartada | Ventaja
+@ROW Framework backend | FastAPI | Rendimiento asíncrono, validación con Pydantic, documentación OpenAPI automática (D-01) | Flask / Django | Menos código, tipos y validación integradas, OpenAPI para las pruebas.
+@ROW Frontend | HTML/CSS/JS nativo (SPA) | Sin dependencias de frameworks; legibilidad para proyecto académico (D-01) | React / Vue con bundler | Resume el alcance y facilita la revisión del código.
+@ROW ORM | SQLAlchemy 2.0 | Modelado declarativo y portabilidad de BD (RNF-009, D-04) | SQL crudo / Tortoise ORM | Migración SQLite a PostgreSQL configurable por URL.
+@ROW Base de datos | SQLite (migrable a PostgreSQL) | Cero configuración local; despliegue académico (D-04) | MySQL / solo PostgreSQL | Reproducibilidad inmediata sin servidor de BD.
+@ROW Autenticación | JWT con bcrypt | Sesión sin estado, estándar de la API (RNF-002) | Sesiones en cookie / OAuth completo | Simplicidad y escala local.
+@ROW Extracción PDF | PyPDF2 | Madurez y cero dependencias nativas | pdfplumber / pdfminer.six | Menor superficie de instalación; RAG requiere solo texto.
+@ROW Extracción DOCX/TXT | python-docx y lectura texto plano | Lectura fiable de .docx; TXT por código nativo | docx2txt | Menos dependencias y control del texto extraído.
+@ROW Embeddings | Hashing ponderado local (modo demo); OpenAI text-embedding-3-small opcional (D-02) | Funcionamiento sin API key y sin costo | FAISS / ChromaDB (persistencias vectoriales) | El flujo de IA demuestra el RAG y puede migrar a vector DB como mejora.
+@ROW Generación RAG | Respuesta por fragmentos (demo) o LLM OpenAI opcional (D-02) | Presupuesto acotado; evidencia con citas siempre (RB-008) | Solo LLM (dependencia total) | Sistema operable sin clave y mejorable con clave.
+@ROW Visor de PDF | pdf.js (descargado a dist) | Visualización de los documentos cargados sin extensiones | No visor / iframe | Experiencia integrada en el detalle (RF-019).
+@ROW Estructura de carpetas | frontend/ y backend/app/ existentes (D-03) | Reutiliza la auditoría y mantiene consistencia | Monorepo aplanado | Trazabilidad directa con la FASE 1.
+@ENDT
+@PB
+
+@H1 Conclusiones
+@P El diseño presentado convierte la línea base del análisis en un modelo técnico coherente y trazable: arquitectura por capas con FastAPI y SPA nativa, modelo de datos relacional con siete entidades (cuatro de ellas nuevas según la auditoría), API REST documentada endpoint por endpoint con sus requisitos y casos de uso, flujo documental especificado con estados válidos, y estrategia de IA híbrida que garantiza operación sin costo y mejora opcional con LLM.
+@P El diseño conserva las marcas de consistencia: los componentes Repository, Category, DocumentExtraction y ErrorLog, y los servicios extractor y motor de chat, se declaran como a implementar en la FASE 4, evitando presentar como existente lo que la auditoría determinó como faltante. Las decisiones D-01 a D-04 quedan formalizadas como línea base.
+@P Con este documento el proyecto pasa de qué construir (análisis) a cómo construirlo (diseño), quedando listo para la FASE 4 (Desarrollo), donde la implementación deberá corresponder exactamente a este modelo y verificarse contra el código real.
+@PB
+
+@H1 Referencias
+@LI FastAPI. FastAPI Documentation. https://fastapi.tiangolo.com/
+@LI SQLAlchemy. SQLAlchemy 2.0 Documentation. https://docs.sqlalchemy.org/
+@LI Pydantic. Pydantic Documentation. https://docs.pydantic.dev/
+@LI OAuth 2.0 y JWT: RFC 6749 y RFC 7519.
+@LI Bcrypt. bcrypt project documentation. https://pypi.org/project/bcrypt/
+@LI PyPDF2. PyPDF2 Documentation. https://pypi.org/project/PyPDF2/
+@LI python-docx. Documentation. https://python-docx.readthedocs.io/
+@LI pdf.js. Mozilla PDF.js Project. https://mozilla.github.io/pdf.js/
+@LI OpenAI. API Reference (Embeddings y Chat Completions). https://platform.openai.com/docs/
+@LI Lewis, P., et al. Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. arXiv:2005.11401 (2020).
+@LI Pressman, R. y Maxim, B. Ingeniería del Software: Un enfoque práctico. 8a edición. McGraw-Hill, 2015.
+@LI ISO/IEC/IEEE 12207. Processes in the software life cycle. 2017.
+@PB

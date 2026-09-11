@@ -1,0 +1,251 @@
+@TITLE DocuPasion
+@SUB Código Fuente (Descripción y Trazabilidad)
+@SUB FASE 6 - CÓDIGO FUENTE
+@AUTHOR Equipo de Ingeniería
+@DATE 11 de septiembre de 2026
+@PB
+@H1 Tabla de contenido
+@LI 1. Introducción
+@LI 2. Estructura del proyecto
+@LI 3. Backend: arquitectura de módulos
+@LI 4. Modelo de datos: tablas y relaciones
+@LI 5. API: descriptores de endpoints
+@LI 6. Servicios de IA: pipeline y motor RAG
+@LI 7. Frontend: estructura SPA
+@LI 8. Trazabilidad de requisitos en código
+@LI Conclusiones
+@LI Referencias
+@PB
+
+@H1 1. Introducción
+@H2 1.1 Propósito del documento
+@P Este documento describe la estructura, composición y relaciones del código fuente de DocuPasion, así como la ubicación de cada función y clase que materializa los requisitos del análisis y del diseño. Está dirigido a quien necesite comprender, mantener o extender el sistema, y sirve como respaldo del trabajo de implementación de la FASE 5 (prototipo y avanz de código).
+@P La descripción se organiza por capas (backend API, servicios, persistencia, frontend) y cada módulo se presenta con su propósito, funciones principales, parámetros y requisitos asociados. El documento finaliza con una matriz de trazabilidad que vincula los códigos RF/RNF/RB/CU directamente con las líneas de código que los implementan.
+@H2 1.2 Alcance y convenciones
+@P El código está organizado en dos carpetas principales: backend/ (API Python con FastAPI) y frontend/ (SPA con HTML5, CSS3 y JavaScript nativo). Se describe la versión incluida en la carpeta de entrega 09_Codigo_Fuente y se señalan los módulos marcados como nuevos según la auditoría de la FASE 1.
+@PB
+
+@H1 2. Estructura del proyecto
+@P La siguiente tabla muestra el árbol de archivos fuente del sistema. Las rutas son relativas a la raíz del proyecto DocuPasion.
+@TABLE
+@HDR Ruta | Descripción
+@ROW backend/requirements.txt | Dependencias de Python del sistema (FastAPI, SQLAlchemy, PyPDF2, python-docx, openai, jose, bcrypt, uvicorn, pydantic-settings).
+@ROW backend/app/main.py | Punto de entrada de la aplicación. Crea el esquema, siembra categorías, configura CORS, registra routers y sirve el frontend.
+@ROW backend/app/database.py | Configuración del motor SQLAlchemy, fábrica de sesiones y función get_db (dependency injection).
+@ROW backend/app/core/config.py | Clase Settings (BaseSettings) con valores desde .env y por defecto. Propiedad cors_origins_list.
+@ROW backend/app/core/security.py | Funciones de hash/verificación bcrypt, creación y decodificación de tokens JWT.
+@ROW backend/app/models/user.py | Modelo User con roles (client/admin), hash de contraseña y relación con documentos y repositorios.
+@ROW backend/app/models/repository.py | Modelo Repository (nuevo): nombre, owner, fecha. UniqueConstraint por usuario.
+@ROW backend/app/models/category.py | Modelo Category (nuevo): nombre único, descripción, bandera de default.
+@ROW backend/app/models/document.py | Modelo Document: archivos, estados, categoría FK, repositorio FK, texto extraído, resumen, propietario.
+@ROW backend/app/models/document_extraction.py | Modelo DocumentExtraction (nuevo): campos de información extraída por tipo de documento.
+@ROW backend/app/models/ai_log.py | Modelo AILog: registro de operaciones de IA (tokens, tiempos).
+@ROW backend/app/models/error_log.py | Modelo ErrorLog (nuevo): registro de errores de procesamiento (RB-010).
+@ROW backend/app/models/system_config.py | Modelo SystemConfig (nuevo): parámetros del sistema por llave-valor (RF-020).
+@ROW backend/app/api/deps.py | Dependencias FastAPI: get_current_user (valida JWT), get_current_admin (valida rol).
+@ROW backend/app/api/auth.py | Router /api/auth: registro (RB-004), login (JWT), perfil /me.
+@ROW backend/app/api/repositories.py | Router /api/repositories: crear, listar, renombrar, eliminar (con protección de dependencias).
+@ROW backend/app/api/documents.py | Router /api/documents: upload (multipart), listar, detalle, descargar, eliminar, estadísticas.
+@ROW backend/app/api/ai_chat.py | Router /api/chat: búsqueda semántica y consulta RAG con aislamiento por usuario.
+@ROW backend/app/api/monitoring.py | Router /api/monitoring: logs de errores y de IA (solo admin).
+@ROW backend/app/api/config.py | Router /api/config: lectura/escritura de parámetros (solo admin).
+@ROW backend/app/services/pdf_parser.py | Servicio de extracción de texto de PDF, DOCX y TXT.
+@ROW backend/app/services/document_analyzer.py | Servicio de clasificación por reglas (4+1 categorías) y resumen por fragmentos.
+@ROW backend/app/services/extractor.py | Servicio de extracción de información relevante por tipo de documento (nuevo).
+@ROW backend/app/services/embedding.py | Servicio de embeddings: chunks con superposición, generación determinística local o vía OpenAI.
+@ROW backend/app/services/config_service.py | Servicio de configuración: merge de valores por defecto (env) con overrides de la BD (nuevo).
+@ROW backend/app/services/rag_engine.py | Motor RAG: indexación, búsqueda semántica y keyword, respuesta con o sin LLM (aislado por usuario).
+@ROW frontend/index.html | Punto de entrada HTML de la SPA (vistas, formularios, modales).
+@ROW frontend/css/styles.css | Hoja de estilos completa (paleta morada, layout, componentes, responsive).
+@ROW frontend/js/api.js | Capa de comunicación con la API (fetch con JWT, manejo de errores, descarga de blob).
+@ROW frontend/js/app.js | Lógica de la aplicación: autenticación, routing, renderizado de cada vista.
+@ENDT
+@PB
+
+@H1 3. Backend: arquitectura de módulos
+@H2 3.1 Punto de entrada (app/main.py)
+@P Funciones: crear esquema (Base.metadata.create_all), sembrar categorías (seed_categories), configurar CORS, registrar routers (auth, documents, ai_chat, repositories, monitoring, config), crear ruta de salud /api/health y montar archivos estáticos del frontend con StaticFiles (html=True) al final del árbol de rutas para no ocultar /api y /docs.
+@P El montaje del frontend resuelve la ruta del directorio相对于 la posición del propio archivo main.py usando Path.parents[1], lo que lo hace independiente del directorio de trabajo del sistema operativo.
+@H2 3.2 Base de datos (app/database.py)
+@P Funciones: crear_engine con check_same_thread=False para SQLite; SessionLocal; get_db() como generador dependency injection para FastAPI. La función create_all en main.py crea todas las tablas declaradas por los modelos importados antes de la llamada.
+@H2 3.3 Configuración (app/core/config.py)
+@P La clase Settings hereda de BaseSettings (pydantic-settings) y carga valores desde .env. Incluye campos de seguridad (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES), IA (OPENAI_API_KEY, EMBEDDING_MODEL, LLM_MODEL, CHUNK_SIZE, CHUNK_OVERLAP) y sistema (APP_NAME, VERSION, DATABASE_URL, UPLOAD_DIR, FRONTEND_DIR, CORS_ORIGINS). La función get_settings() usa lru_cache para una sola instancia en memoria.
+@H2 3.4 Seguridad (app/core/security.py)
+@P Funciones: hash_password() y verify_password() con bcrypt; create_access_token() y decode_access_token() con python-jose. El token almacena el email del usuario como campo sub.
+@H2 3.5 Dependencias (app/api/deps.py)
+@P get_current_user: extrae el token del header Authorization, decodifica el payload, busca el usuario por email. Si falla alguna etapa, devuelve 401. get_current_admin: valida que user.role == UserRole.ADMIN; de lo contrario, 403.
+@PB
+
+@H1 4. Modelo de datos: tablas y relaciones
+@P El sistema tiene 8 tablas. Las relaciones de llave foránea garantizan integridad referencial. El modelo se define con SQLAlchemy ORM y se crea automáticamente al iniciar el servidor.
+@TABLE
+@HDR Tabla | Tabla FK | Tipo de relación | Descripción
+@ROW users | | | Usuarios del sistema (email, password hasheada, rol, fecha).
+@ROW repositories | users.id | 1-N (owner) | Repositorios del usuario; UniqueConstraint(owner_id, name).
+@ROW categories | | | Catálogo de categorías (académico, técnico, legal, administrativo, general); is_default.
+@ROW documents | users.id | 1-N (owner) | Archivos; repository_id nullable; category_id nullable; status (processing/indexed/failed); texto extraído; resumen.
+@ROW documents | repositories.id | 1-N (nullable) | Documento pertenece a un repositorio o ninguno.
+@ROW documents | categories.id | 1-N (nullable) | Categoría asignada por el clasificador.
+@ROW document_extractions | documents.id | 1-N (cascade delete) | Campos de información extraídos por tipo de documento.
+@ROW ai_logs | documents.id | 1-N (nullable) | Registro de cada operación de IA: tokens, tiempo, tipo.
+@ROW error_logs | documents.id | 1-N (nullable) | Registro de errores de procesamiento (código, mensaje, nivel).
+@ROW system_config | | | Parámetros del sistema (llave-valor); chunk_size, chunk_overlap, llm_model.
+@ENDT
+@P La tabla documents contiene la columna filename (nombre seguro en disco, con UUID) y original_filename (nombre original subido por el usuario). La columna status controla el flujo documental: processing → indexed (éxito) o → failed (error). Al eliminar un documento, se eliminan físicamente sus extracciones, logs de IA y errores, además de su archivo en disco y su índice en memoria (RB-010).
+@PB
+
+@H1 5. API: descriptores de endpoints
+@P Cada endpoint se describe con su método HTTP, ruta, propósito, parámetros, cuerpo de respuesta, requisitos y códigos de error.
+@H2 5.1 Autenticación (/api/auth)
+@B POST /api/auth/register
+@LI Propósito: crear una cuenta con rol cliente (CU-001, RB-004).
+@LI Body (JSON): { email, password }.
+@LI Respuesta 201: { id, email, role, access_token, token_type }.
+@LI Errores: 400 (email duplicado o formato inválido).
+@LI Código: backend/app/api/auth.py:register().
+@B POST /api/auth/login
+@LI Propósito: obtener un token JWT (CU-002).
+@LI Body (form): username (email), password.
+@LI Respuesta 200: { access_token, token_type }.
+@LI Errores: 401 (credenciales incorrectas).
+@LI Código: backend/app/api/auth.py:login().
+@B GET /api/auth/me
+@LI Propósito: obtener el perfil del usuario autenticado.
+@LI Respuesta 200: { id, email, role }.
+@LI Errores: 401 (token ausente o vencido).
+@LI Código: backend/app/api/auth.py:me().
+@H2 5.2 Repositorios (/api/repositories)
+@B GET /api/repositories/
+@LI Propósito: listar repositorios del usuario con conteo de documentos.
+@LI Código: backend/app/api/repositories.py:list_repositories().
+@B POST /api/repositories/
+@LI Propósito: crear un repositorio (CU-004).
+@LI Body: { name }.
+@LI Código: backend/app/api/repositories.py:create_repository().
+@B PATCH /api/repositories/{repo_id}
+@LI Propósito: renombrar un repositorio (CU-005).
+@LI Código: backend/app/api/repositories.py:rename_repository().
+@B DELETE /api/repositories/{repo_id}
+@LI Propósito: eliminar repositorio; 409 si tiene documentos (CU-005).
+@LI Código: backend/app/api/repositories.py:delete_repository().
+@H2 5.3 Documentos (/api/documents)
+@B POST /api/documents/upload
+@LI Propósito: cargar PDF/DOCX/TXT, iniciar pipeline de IA (CU-006/CU-010).
+@LI Body (multipart): file + repository_id (opcional).
+@LI Respuesta 201: objeto Document con estado.
+@LI Código: backend/app/api/documents.py:upload_document().
+@B GET /api/documents/
+@LI Propósito: listar documentos con filtros por repositorio, categoría, estado y búsqueda (CU-007).
+@LI Código: backend/app/api/documents.py:list_documents().
+@B GET /api/documents/{doc_id}
+@LI Propósito: detalle completo: metadatos, resumen, extracciones y vista previa (CU-007).
+@LI Código: backend/app/api/documents.py:get_document().
+@B GET /api/documents/{doc_id}/download
+@LI Propósito: descargar el archivo original (CU-008).
+@LI Código: backend/app/api/documents.py:download_document().
+@B DELETE /api/documents/{doc_id}
+@LI Propósito: eliminar documento, archivo y registros (CU-009, RB-010).
+@LI Código: backend/app/api/documents.py:delete_document().
+@B GET /api/documents/stats/summary
+@LI Propósito: estadísticas del dashboard (CU-013).
+@LI Código: backend/app/api/documents.py:stats().
+@H2 5.4 Chat y búsqueda (/api/chat)
+@B POST /api/chat/
+@LI Propósito: consulta RAG en lenguaje natural (CU-012, RF-015).
+@LI Body: { message }.
+@LI Código: backend/app/api/ai_chat.py:chat().
+@B GET /api/chat/search?q=...
+@LI Propósito: búsqueda por palabras clave (CU-011, RF-014).
+@LI Código: backend/app/api/ai_chat.py:search().
+@H2 5.5 Monitoreo (/api/monitoring) - solo admin
+@B GET /api/monitoring/logs
+@LI Propósito: estados y errores de procesamiento (CU-014).
+@LI Código: backend/app/api/monitoring.py:get_error_logs().
+@B GET /api/monitoring/ai-logs
+@LI Propósito: registros de operaciones de IA (CU-014).
+@LI Código: backend/app/api/monitoring.py:get_ai_logs().
+@H2 5.6 Configuración (/api/config) - solo admin
+@B GET /api/config/
+@LI Propósito: consultar parámetros sin secretos (CU-015, RF-020).
+@LI Código: backend/app/api/config.py:get_config().
+@B PUT /api/config/
+@LI Propósito: actualizar y persistir parámetros (CU-015, RF-020).
+@LI Código: backend/app/api/config.py:update_config().
+@PB
+
+@H1 6. Servicios de IA: pipeline y motor RAG
+@H2 6.1 Pipeline de procesamiento documental
+@P El pipeline se ejecuta de forma síncrona durante el upload (POST /api/documents/upload) en el siguiente orden:
+@LI 1. Extracción de texto (services/pdf_parser.py): lee PDF con PyPDF2, DOCX con python-docx o TXT con apertura nativa. Si no hay texto, el documento pasa a estado failed.
+@LI 2. Clasificación (services/document_analyzer.py:classify): compara palabras clave del texto contra un diccionario de 4 categorías (académico, técnico, legal, administrativo). Si ninguna supera el umbral de 2 coincidencias, asigna "general".
+@LI 3. Resumen (services/document_analyzer.py:summarize): extrae las primeras 5 oraciones significativas (mínimo 20 caracteres cada una).
+@LI 4. Extracción de información (services/extractor.py:extract): aplica heurísticas por tipo de documento: académico (año, autor, institución, palabras clave), técnico (requisitos, arquitectura, tecnologías, formatos), legal (partes, cláusulas, fechas, vigencia) o administrativo (asistentes, acuerdos, fechas).
+@LI 5. Chunking y embeddings (services/embedding.py): divide el texto en chunks de 512 tokens con 64 de solapamiento; genera vectores determinísticos locales o vía OpenAI text-embedding-3-small.
+@LI 6. Indexación (services/rag_engine.py:index_document): almacena chunks, vectores, doc_id y owner_id en un diccionario en memoria para búsqueda rápida.
+@H2 6.2 Motor RAG (services/rag_engine.py)
+@P El motor RAG gestiona la recuperación de información y la generación de respuestas fundamentadas. Cada operación filtra por owner_id para garantizar el aislamiento entre usuarios.
+@B Funciones principales:
+@LI _load_index(): se ejecuta al instanciar; carga todos los documentos indexados con su owner_id en el índice en memoria.
+@LI search(query, owner_id, top_k): búsqueda semántica por similitud coseno; filtra chunks por owner_id.
+@LI keyword_search(query, owner_id): búsqueda textual; busca el término en el texto de documentos del usuario.
+@LI answer(query, owner_id): end-to-end RAG; recupera top-5 chunks, genera respuesta con LLM (si hay API key) o modo demo, registra la operación en AILog.
+@H2 6.3 Servicio de configuración (services/config_service.py)
+@P La clase ConfigService combina los valores por defecto del archivo .env (a través de Settings) con los valores persistidos en la tabla system_config. La función get_int() se usa en rag_engine.py y embedding.py para leer chunk_size y chunk_overlap en tiempo de ejecución, permitiendo que el administrador modifique los parámetros sin reiniciar el servidor (RF-020).
+@PB
+
+@H1 7. Frontend: estructura SPA
+@H2 7.1 index.html
+@P Archivo de entrada que contiene las vistas (sections): login/registro, dashboard, repositorios, documentos, chat, monitoreo y configuración. Los modales de detalle del documento y de repositorio están al final del body. El archivo carga las dependencias externas (Inter, lucide, pdf.js) y los archivos locales (css/styles.css, js/api.js, js/app.js).
+@H2 7.2 css/styles.css
+@P Hoja de estilos completa que implementa la paleta morada del diseño original, el layout flex con sidebar, las tarjetas de estadísticas, la zona de carga, la tabla de documentos, el chat con burbujas, los modales, los toasts y la media query para pantallas pequeñas (columna vertical).
+@H2 7.3 js/api.js
+@P Capa de comunicación con la API. Objeto API con métodos get, post, put, patch, del, upload y download. Cada petición adjunta automáticamente el token JWT del localStorage; si la respuesta es 401, cierra sesión. La función download() devuelve un Blob para descargas autorizadas.
+@H2 7.4 js/app.js
+@P Objeto App con toda la lógica: inicialización, autenticación (login/register), routing entre vistas, carga del dashboard con estadísticas, CRUD de repositorios con modales, gestión de documentos con filtros por repositorio/categoría/estado y búsqueda por nombre, subida por drag-and-drop o input, descarga autorizada con a[download], detalle del documento con visor PDF (pdf.js) y tabla de extracciones, chat RAG con fuentes, monitoreo de errores y logs de IA (admin), y configuración del sistema (admin). La inicialización se ejecuta de forma segura tanto con DOMContentLoaded como con readyState != 'loading'.
+@PB
+
+@H1 8. Trazabilidad de requisitos en código
+@P La siguiente tabla asocia cada requisito funcional (RF) con el archivo y función que lo implementa directamente.
+@TABLE
+@HDR Requisito | Función/Archivo | Descripción
+@ROW RF-001 | auth.py:register(), login(), me() | Registro, login y perfil con JWT.
+@ROW RF-002 | deps.py:get_current_admin() | Control de acceso por roles (client/admin).
+@ROW RF-003 | repositories.py:create_repository() | Crear repositorio del usuario.
+@ROW RF-004 | repositories.py:rename_repository(), delete_repository() | Renombrar/eliminar repositorio propio.
+@ROW RF-005 | documents.py:upload_document() | Cargar PDF/DOCX/TXT con validación de tamaño.
+@ROW RF-006 | documents.py:list_documents(), get_document() | Listar y consultar documentos propios.
+@ROW RF-007 | documents.py:download_document() | Descargar archivo original.
+@ROW RF-008 | documents.py:delete_document() | Eliminar documento, archivo y registros.
+@ROW RF-009 | pdf_parser.py:extract_text() | Extraer texto de PDF, DOCX y TXT.
+@ROW RF-010 | document_analyzer.py:classify() | Clasificar en 4+1 categorías por reglas.
+@ROW RF-011 | document_analyzer.py:summarize() | Generar resumen por fragmentos.
+@ROW RF-012 | extractor.py:extract() | Extraer campos relevantes por tipo de documento.
+@ROW RF-013 | embedding.py:chunk_text(), embed_texts() | Dividir en chunks y generar vectores.
+@ROW RF-014 | ai_chat.py:search(), rag_engine.py:keyword_search() | Búsqueda por palabras clave (filtrada por usuario).
+@ROW RF-015 | ai_chat.py:chat(), rag_engine.py:answer() | Consulta RAG con fuentes y modo demo/llm.
+@ROW RF-016 | documents.py:stats() | Estadísticas: total, procesados, fallidos, por categoría/estado, preguntas, ahorro.
+@ROW RF-017 | documents.py (upload): _add_error_log(), _add_ai_log() | Registro de errores y operaciones de IA.
+@ROW RF-018 | frontend/js/app.js:loadMonitoring() | Visualización de estados y logs.
+@ROW RF-019 | documents.py:get_document() + detailModal | Detalle con categoría, resumen, extracciones y vista previa.
+@ROW RF-020 | config.py:get_config(), update_config(); config_service.py | Configuración del sistema por el administrador.
+@ENDT
+@P Los requisitos no funcionales (RNF) se cubren transversalmente: RNF-001 (bcrypt), RNF-002 (JWT), RNF-003 (.env y .gitignore), RNF-004 (owner_id en queries), RNF-005/006 (FastAPI + pipeline síncrono), RNF-007 (requirements.txt), RNF-008 (interfaz en español), RNF-009 (SQLAlchemy + URL configurable), RNF-010 (modularidad por capas), RNF-011 (navegadores modernos), RNF-012 (documentos de prueba sintéticos) y RNF-013 (Base.metadata.create_all). Las reglas de negocio (RB-001 a RB-011) se implementan en validaciones de la API y en el pipeline de IA descrito en la sección 6.
+@PB
+
+@H1 Conclusiones
+@P El código fuente de DocuPasion consta de 37 archivos fuente organizados por capas claras: persistencia (models), lógica de negocio (services), transporte (API) y presentación (frontend SPA). La auditoría de la FASE 1 identificó 7 componentes faltantes o parciales; todos fueron implementados en la FASE 5 de acuerdo con el diseño: Repository, Category, DocumentExtraction, ErrorLog, SystemConfig (modelos), extractor.py y config_service.py (servicios), y los routers repositories, monitoring y config (API).
+@P Las correcciones de seguridad realizadas (fix de la verificación de rol admin en deps.py, eliminación del campo role del registro público en auth.py, aislamiento por owner_id en el motor RAG) cierran las brechas detectadas en la auditoría. El frontend pasó de un prototipo visual a una SPA funcional conectada a la API, con manejo de errores, estados de carga y protección de rutas según el rol.
+@P Este documento y la carpeta 09_Codigo_Fuente constituyen la evidencia de la implementación y sirven de base para la verificación en la FASE 8 (Pruebas) y la documentación en la FASE 9 (Trazabilidad final).
+@PB
+
+@H1 Referencias
+@LI FastAPI. FastAPI Documentation. https://fastapi.tiangolo.com/
+@LI SQLAlchemy. SQLAlchemy 2.0 Documentation. https://docs.sqlalchemy.org/
+@LI Pydantic. Pydantic Documentation. https://docs.pydantic.dev/
+@LI python-jose. JWT library. https://python-jose.readthedocs.io/
+@LI bcrypt. bcrypt project. https://pypi.org/project/bcrypt/
+@LI PyPDF2. PyPDF2 Documentation. https://pypi.org/project/PyPDF2/
+@LI python-docx. Documentation. https://python-docx.readthedocs.io/
+@LI pdf.js. Mozilla PDF.js. https://mozilla.github.io/pdf.js/
+@LI OpenAI. API Reference. https://platform.openai.com/docs/
+@LI Lewis, P., et al. Retrieval-Augmented Generation. arXiv:2005.11401 (2020).

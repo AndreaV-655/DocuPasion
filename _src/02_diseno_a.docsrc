@@ -1,0 +1,218 @@
+@TITLE DocuPasion
+@SUB Documento de Diseño (Arquitectura)
+@SUB FASE 3 - DISEÑO
+@AUTHOR Equipo de Ingeniería
+@DATE 11 de septiembre de 2026
+@PB
+@H1 Tabla de contenido
+@LI 9.1 Arquitectura general
+@LI 9.2 Arquitectura del frontend
+@LI 9.3 Arquitectura del backend
+@LI 9.4 Arquitectura de datos
+@LI 9.5 Almacenamiento documental
+@LI 9.6 Arquitectura de IA
+@LI 9.7 Diagrama general de arquitectura
+@LI 9.8 Diagrama de casos de uso
+@LI 9.9 Diagrama de componentes
+@LI 9.10 Diagrama de despliegue
+@LI 9.11 Diagramas de secuencia
+@LI 9.12 Modelo entidad-relación
+@LI 9.13 Diccionario de datos
+@LI 9.14 Diseño de la API
+@LI 9.15 Diseño de interfaces
+@LI 9.16 Flujo documental
+@LI 9.17 Integración con IA
+@LI 9.18 Seguridad
+@LI 9.19 Decisiones tecnológicas
+@LI Conclusiones
+@LI Referencias
+@PB
+
+@H1 1. Introducción
+@H2 1.1 Propósito del documento
+@P Este documento describe el diseño técnico del sistema DocuPasion, establecido a partir del Documento de Análisis (FASE 2) y de la auditoría del código existente (FASE 1). Su objetivo es servir de modelo para la implementación: arquitectura por capas, componentes, modelo de datos, API, interfaces, flujo documental, seguridad y decisiones tecnológicas.
+@P Para mantener la trazabilidad con la auditoría, cada elemento de diseño que ya existe en el código se identifica como implementado, y cada componente que el análisis determinó como faltante o parcial se marca como diseño a implementar en la FASE 4 (Desarrollo). Las decisiones D-01 a D-04 del análisis se toman como línea base aprobada provisionalmente.
+@H2 1.2 Alcance del diseño
+@P El diseño cubre el sistema completo: registro y autenticación de usuarios con roles cliente y administrador, repositorios, carga y gestión de documentos (PDF, DOCX, TXT hasta 10 MB), procesamiento de IA (extracción, clasificación, resumen, información relevante, embeddings), búsqueda semántica, consulta en lenguaje natural (RAG), dashboard, monitoreo de procesamiento y configuración del sistema.
+@P Quedan fuera del diseño (declaradas como exclusión en la FASE 2): reconocimiento óptico de caracteres (OCR), edición de archivos en línea, firma electrónica, versionado y aplicaciones móviles.
+@H2 1.3 Relación con los requisitos
+@P El diseño implementa los 20 requisitos funcionales (RF-001 a RF-020) y atiende los 13 requisitos no funcionales (RNF-001 a RNF-013) del análisis. La matriz de trazabilidad de la sección 8.17 del documento de análisis se retoma en la sección 9.14 para asociar cada endpoint con sus requisitos y casos de uso.
+@PB
+
+@H1 9.1 Arquitectura general
+@P El sistema adopta una arquitectura por capas (n-tier lógica) con un backend monolítico modular basado en FastAPI, un frontend de aplicación de página única (SPA) en HTML, CSS y JavaScript nativo, y una base de datos relacional. La separación en capas aísla la presentación, la lógica de aplicación, los servicios y el acceso a datos.
+@B Capas del sistema:
+@LI Capa de presentación. Frontend estático servido por FastAPI y ejecutado en el navegador. Consume la API REST mediante fetch.
+@LI Capa de API. FastAPI expone los endpoints REST en /api. Incluye autenticación JWT, validación de entrada y respuestas JSON.
+@LI Capa de servicios. Implementa la lógica de negocio y del conocimiento: análisis documental, procesamiento de IA, motor de recuperación y generación.
+@LI Capa de acceso a datos. SQLAlchemy (ORM) con modelo de datos y encapsulamiento de consultas.
+@LI Capa de persistencia. Base de datos relacional SQLite (desplegable a PostgreSQL, decisión D-04), almacenamiento de archivos en el sistema de archivos local e índice vectorial en memoria.
+@P El flujo general es: el usuario interactúa con el frontend; el frontend llama a la API; la API valida y orquesta los servicios; los servicios operan sobre la capa de datos y el almacenamiento; las operaciones de IA se registran; y la respuesta vuelve al frontend.
+@B Ventajas de la decisión:
+@LI El frontend y el backend se comunican solo por la API REST, lo que permite probar y evolucionar capas de forma independiente.
+@LI El monolito modular reduce la complejidad de despliegue para un proyecto académico y permite migrar a servicios posteriores si se requiere.
+@LI SQLAlchemy con URL de base de datos configurable cumple el requisito RNF-009 (migración de SQLite a PostgreSQL sin rediseño).
+@PB
+
+@H1 9.2 Arquitectura del frontend
+@P El frontend es una SPA en HTML5, CSS3 y JavaScript (ES6+) sin frameworks, servida como archivos estáticos desde FastAPI (StaticFiles con directorio frontend). Toda la interactividad se logra con fetch a la API y manipulación del DOM.
+@B Estructura de vistas (pantallas):
+@LI Login y Registro.
+@LI Dashboard con indicadores.
+@LI Gestión de repositorios (crear, renombrar, eliminar, navegar).
+@LI Listado de documentos con filtros por repositorio, categoría y estado, y búsqueda.
+@LI Detalle de documento: metadatos, categoría, resumen, información extraída y estado.
+@LI Chat de consulta en lenguaje natural con historial de preguntas y respuestas con fuentes.
+@LI Monitoreo de procesamiento y errores (solo administrador).
+@LI Configuración del sistema (solo administrador).
+@B Mecanismos del frontend:
+@LI Sesión: el token JWT se almacena en el navegador y se adjunta en la cabecera Authorization: Bearer para cada petición.
+@LI Control de acceso: la interfaz oculta y protege las rutas de administración cuando el rol del usuario es cliente.
+@LI Gestión de estado: jerarquía de componentes JS (autenticación, repositorios, documentos, chat, dashboard) que mantiene datos en memoria y refresca desde la API.
+@LI Archivos: uso de FileReader y object URL para previsualización local antes de subir; subida mediante FormData multipart.
+@LI PDF: visualización integrada con el visor de pdf.js descargado al proyecto en la fase de construcción (npm local a dist).
+@B Nota de consistencia: en la FASE 1 se auditó que la interfaz actual (frontend/index.html) es un prototipo visual desconectado del backend. El diseño de esta sección describe la interfaz integrada a desarrollar en la FASE 4 para cumplir los requisitos RF-005 a RF-019.
+@P La actualización del dashboard se apoya en el endpoint de estadísticas (RF-016) y los estados de procesamiento se visualizan como insignias en el listado (RF-018).
+@PB
+
+@H1 9.3 Arquitectura del backend
+@P El backend es una API REST construida con FastAPI, organizada por módulos (routers) y funciones de propósito único, cumpliendo los requisitos RNF-005, RNF-006 y RNF-010 (modularidad y mantenibilidad).
+@B Módulos de API:
+@LI auth: registro, inicio y cierre de sesión, perfil (RF-001, RF-002).
+@LI repositories: creación, listado, renombrado y eliminación de repositorios (RF-003, RF-004).
+@LI documents: carga, listado, detalle, descarga, eliminación y estadísticas (RF-005 a RF-008, RF-016, RF-018, RF-019).
+@LI ai_chat: búsqueda en el contenido y consulta RAG en lenguaje natural (RF-014, RF-015).
+@LI monitoring: estados de procesamiento y registros de errores y de IA (RF-017).
+@LI config: parámetros del sistema (RF-020).
+@B Capa de servicios:
+@LI pdf_parser.py: extracción de texto de PDF, DOCX y TXT (RF-009).
+@LI document_analyzer.py: clasificación por reglas y resumen (RF-010, RF-011).
+@LI extractor.py: extracción de información relevante por tipo de documento (RF-012). Servicio nuevo según la auditoría.
+@LI embedding.py: generación de embeddings y chunking (RF-013).
+@LI rag_engine.py: indexación alternativa (keywords + códigos), recuperación y generación de la respuesta (RF-014, RF-015).
+@B Capa de datos:
+@LI models: definen User, Repository, Category, Document, DocumentExtraction, AILog y ErrorLog. Repository, Category, DocumentExtraction y ErrorLog son modelos nuevos diseñados para la FASE 4 según la auditoría.
+@LI database.py: motor, sesión y gestión del esquema.
+@B Mecanismos transversales:
+@LI Depends de FastAPI para inyección de dependencias y para extraer y validar el usuario autenticado desde el token JWT.
+@LI Parámetros de configuración en core/config.py cargados desde variables de entorno (.env).
+@LI Manejo centralizado de excepciones con respuestas JSON uniformes.
+@PB
+
+@H1 9.4 Arquitectura de datos
+@P El modelo de datos es relacional y se define con SQLAlchemy 2.0 (mapping declarativo con Mapped y mapped_column). La persistencia por defecto es SQLite (decisión D-04) con URL configurable por entorno, garantizando la migración a PostgreSQL sin cambios estructurales (RNF-009).
+@B Entidades del dominio:
+@LI User: credenciales, hashed_password (bcrypt) y rol.
+@LI Repository: carpeta virtual de organización; propiedad del usuario (RB-003).
+@LI Category: catálogo de categorías de clasificación.
+@LI Document: metadatos, ruta física, estados y resultado del análisis (categoría, resumen, texto extraído).
+@LI DocumentExtraction: campos de información extraída por documento.
+@LI AILog: registro de operaciones de IA (tokens, tiempos).
+@LI ErrorLog: registro de errores de procesamiento.
+@B Reglas de integridad:
+@LI Las llaves foráneas garantizan la propiedad de repositorios y documentos (RF-006, RB-003).
+@LI El documento referencia una categoría opcional por FK; si la clasificación no supera el umbral se asigna la categoría "general" (RB-007).
+@LI Los estados de procesamiento solo admiten la transición processing a indexed o failed (RB-005).
+@LI La eliminación de un documento elimina el archivo físico, el registro y el índice (RB-010).
+@B Índices previstos:
+@LI user.email (único).
+@LI repository.(owner_id, name) (único).
+@LI document.(owner_id), document.status, document.repository_id y document.category_id.
+@LI document_extractions.(document_id, field_name, extraction_type).
+@B Representación del estado del documento:
+@LI processing: documento cargado y en cola de procesamiento.
+@LI indexed: procesamiento correcto y disponible para análisis y consulta.
+@LI failed: el texto no pudo extraerse o el procesamiento falló; error registrado (RB-006, RF-017).
+@PB
+
+@H1 9.5 Almacenamiento documental
+@P Los archivos originales se guardan en el sistema de archivos local bajo un directorio de uploads, y la base de datos conserva la ruta y metadatos de cada documento. Esta decisión evita almacenar binarios en la base de datos y simplifica la descarga (RF-007).
+@B Diseño del almacenamiento:
+@LI Estructura: carpeta uploads/ para el ambiente local, configurable por entorno (RNF-007).
+@LI Nombre físico seguro: {id_usuario}_{uuid4hex}.{ext}, evitando colisiones y caracteres peligrosos (RNF-001, RNF-003).
+@LI Extensión y límite: el backend valida extensión (PDF, DOCX, TXT) y tamaño máximo de 10 MB (RB-001, RB-002) mediante verificación efectiva y no solo de la cabecera de contenido.
+@LI Metadata: el objeto Document guarda nombre original, nombre físico, ruta, tamaño, tipo MIME, fechas, estado y resultado del análisis.
+@B Gestión del ciclo de vida:
+@LI Alta: se escribe el archivo en disco y se crea el registro con estado processing.
+@LI Procesamiento: el servicio lee el archivo, extrae el texto y completa los campos de análisis.
+@LI Descarga: FileResponse de FastAPI devuelve el archivo con el nombre original.
+@LI Baja: al eliminar el documento se borra el archivo, el registro y el índice (RB-010); si el proceso falla a mitad de la eliminación se registra el error en ErrorLog.
+@B Seguridad del acceso:
+@LI Cada operación verifica que el documento pertenezca al usuario autenticado (owner_id) antes de listar, descargar o eliminar (RNF-004).
+@PB
+
+@H1 9.6 Arquitectura de IA
+@P El sistema integra la inteligencia artificial mediante procesamiento de lenguaje natural sobre el contenido documental. Se adopta la estrategia híbrida de la decisión D-02: embeddings locales preferente para clasificar, resumir y recuperar sin costo; y generación de respuestas por reglas y, opcionalmente, con API de OpenAI si se configura una clave.
+@B Pipeline de procesamiento documental:
+@LI Extracción: pdf_parser extrae el texto plano del archivo (RF-009). Un PDF sin capa de texto se marca failed (RB-006), sin OCR en el alcance.
+@LI Clasificación: el clasificador por reglas compara palabras clave por categoría y asigna la categoría con mayor coincidencia si supera el umbral; en caso contrario asigna "general" (RF-010, RB-007).
+@LI Resumen: el resumidor elige los fragmentos de mayor frecuencia ponderada o significancia hasta un tope de caracteres (RF-011). Nota: en una siguiente iteración puede reemplazarse por un LLM si se configura la clave.
+@LI Extracción de información: el extractor (nuevo) reconoce campos por tipo de documento: académico (autor, año, institución, palabras clave), legal (partes, cláusulas, fechas), técnico (requisitos, arquitectura, tecnologías) (RF-012).
+@LI Chunking y embeddings: el texto se divide en chunks de 512 tokens con 64 de solapamiento (RB-009); cada chunk recibe su representación vectorial mediante embedding (RF-013).
+@B Motor RAG (recuperación aumentada):
+@LI Indexación: cada documento indexado se representa por sus chunks y códigos de contenido (keywords normalizadas) en un índice en memoria (RF-013). El índice se reconstruye al iniciar el servicio.
+@LI Recuperación: la consulta se normaliza y se comparan los chunks por similitud de bloques (método determinístico sobre hashing de palabras normalizadas), conservando los top-5 más relevantes con su documento fuente.
+@LI Generación: si la clave de OpenAI está configurada, se envían al modelo los fragmentos recuperados y la pregunta para generar una respuesta resumida; si no, se devuelve el resumen de los fragmentos con citas. En ambos casos se responden las fuentes y, si no hay evidencia, el sistema informa que no encontró respuesta (RB-008).
+@B Límites y registro:
+@LI Archivos de hasta 10 MB (RB-002) y una sola operación de análisis con uso de contexto acotado.
+@LI Cada operación de IA registra operación, documento, tiempo y tokens en AILog (RF-017).
+@P Este diseño mantiene la trazabilidad RF-009 a RF-015 y sus casos de uso CU-010 a CU-012.
+@PB
+
+@H1 9.7 Diagrama general de arquitectura
+@P Se presenta el diagrama por capas en forma textual; en la versión final del repositorio se adjuntará la imagen equivalente generada con una herramienta de diagramas.
+@PRE
++---------------------------------------------------------------------------+
+|  CAPA DE PRESENTACION  |  SPA en el navegador (HTML5/CSS3/JS nativo)      |
+|                        |  Vistas: Login, Dashboard, Repositorios,         |
+|                        |  Documentos, Detalle, Chat, Monitoreo, Config    |
++----------------------------+----------------------------------------------+
+                             | fetch (JSON)  + token JWT (Authorization)
++----------------------------v----------------------------------------------+
+|  CAPA DE API (FastAPI, /api)                            [Auth JWT]        |
+|  auth | repositories | documents | ai_chat | monitoring | config          |
++-----------------+-------------------+--------------------+---------------+
+                  | Depends / rutas   | servicios          |
++-----------------v-------------------v--------------------+---------------+
+|  CAPA DE SERVICIOS                                                        |
+|  pdf_parser | document_analyzer | extractor | embedding | rag_engine      |
++-----------------+-------------------+--------------------+---------------+
+                  | SQLAlchemy ORM                    | archivos / indice
++-----------------v------------------------------------v-------------------+
+|  PERSISTENCIA:  SQLite (configurable a PostgreSQL) | uploads/           |
+|                 Indice vectorial en memoria        | (archivos PDF/DOCX)|
++---------------------------------------------------------------------------+
+@ENDPRE
+@P Las flechas indican flujo de solicitud y respuesta. El frontend solo conoce la API; la API no expone los servicios ni la persistencia directamente.
+@PB
+
+@H1 9.8 Diagrama de casos de uso
+@P Se presenta la vista de casos de uso en forma textual con actores y casos. El diagrama formal se incluirá como imagen anexa.
+@B Actores:
+@LI Cliente: usuario registrado con rol cliente. Ejecuta: CU-001 a CU-013 (según registros propios).
+@LI Administrador: usuario con rol administrador. Ejecuta: todos los casos del cliente y CU-014 (monitoreo) y CU-015 (configuración).
+@LI Sistema: actor no humano que procesa documentos (CU-010).
+@LI Usuario no registrado: actor que invoca CU-001 (registro) y CU-002 (login).
+@PRE
+                          +---------------------------+
+                          |         SISTEMA           |
+                          +---------------------------+
+                                    ^
+                     (legado de modos del navegador)
+   +---------------------+          |          +------------------+
+   |  Usuario no reg.    |---+------+----------|---+ Administrador|
+   +---------------------+   |                 |   +------------------+
+              CU-001 Registrar         CU-014 Monitorear       |
+              CU-002 Iniciar sesion             CU-015 Configurar |
+   +---------------------------------+         (extends de Cliente)
+   |             Cliente             |----------------------------+
+   +---------------------------------+
+     CU-004 Crear repositorio        CU-010 Procesar con IA (Sistema)
+     CU-005 Administrar repositorio  CU-011 Buscar en contenido
+     CU-006 Cargar documento         CU-012 Preguntar en lenguaje natural
+     CU-007 Consultar documentos     CU-013 Visualizar dashboard
+     CU-008 Descargar documento      CU-009 Eliminar documento
+   +---------------------------------+
+@ENDPRE
+@P La relación entre casos de uso y requisitos está especificada en la sección 8.14 del Documento de Análisis y se mantiene en el diseño.
+@PB

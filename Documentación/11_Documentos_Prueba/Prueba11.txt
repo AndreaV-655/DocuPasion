@@ -1,0 +1,3 @@
+DOCUMENTO TECNICO DE IMPLEMENTACION
+
+El presente informe describe el desarrollo del software para el sistema de gestion. La arquitectura propuesta se compone de un backend en Python y un frontend en JavaScript. El servidor expone una serie de endpoints REST que consumen la API interna y permiten el acceso a la base de datos. La implementacion incluye el despliegue en un entorno de produccion con contenedores Docker, siguiendo las buenas practicas del framework seleccionado. El codigo fuente fue versionado y revisado. Los requisitos funcionales fueron validados por el equipo de sistemas. Se recomienda definir tambien el modelo de datos y los algoritmos de busqueda antes de liberar el producto final.

@@ -1,0 +1,342 @@
+@PB
+@H1 9.9 Diagrama de componentes
+@P Se presenta la composición de módulos y sus dependencias en forma textual. El diagrama formal se incluirá como imagen anexa.
+@PRE
++------------------------- FRONTEND (SPA) -------------------------+
+|  Login/Registro  Dashboard  Repositorios  Documentos  Detalle    |
+|  Chat RAG  Monitoreo  Configuracion                               |
+|  auth.js  api.js (fetch)  ui.js  renderViews          [pdf.js]   |
++--------------------------| fetch/JSON ----------------------------+
+                           v
++------------------------- BACKEND (FastAPI) -----------------------+
+|  /api/auth      | deps.py (JWT + rol)     | core/config.py        |
+|  /api/repos     |-------------------------|-----------------------|
+|  /api/documents | servicios:               | models SQLAlchemy     |
+|  /api/chat      |  pdf_parser             |  database.py          |
+|  /api/monitoring|  document_analyzer      | core/security.py      |
+|  /api/config    |  extractor (nuevo)      |                       |
+|                 |  embedding             |                       |
+|                 |  rag_engine            |                       |
++-----------------|-------------------------|-----------------------+
+                  v                         v
++-----------+  +---------------+  +---------------------+----------+
+|  SQLite/  |  |  uploads/     |  |  Indice vectorial   |  OpenAI |
+|  ORM      |  |  (archivos)   |  |  en memoria (RAG)   | (opc.)  |
++-----------+  +---------------+  +---------------------+----------+
+@ENDPRE
+@B Descripción de componentes:
+@LI auth.js: gestiona token y estados de sesión en el frontend.
+@LI api.js: encapsula peticiones HTTP con cabecera de autorización.
+@LI deps.py: dependencias de FastAPI; valida el token y el rol.
+@LI core/config.py: carga configuración desde variables de entorno.
+@LI core/security.py: cifrado bcrypt, firmado y verificación de JWT.
+@LI models y database.py: modelo relacional y sesión de base de datos.
+@LI Servicios de IA: pipeline y motor RAG descritos en 9.6.
+@PB
+
+@H1 9.10 Diagrama de despliegue
+@P El despliegue objetivo es local y académico (Windows o Linux) sobre el entorno del equipo, cumpliendo RNF-007 (reproducibilidad). Se presenta en forma textual; el diagrama formal se incluirá como imagen anexa.
+@PRE
++------------------------------ NODO DESARROLLO ------------------------------+
+|  Proceso 1: Servidor Web/API (uvicorn: app.main:app)                        |
+|    - Archivos estáticos /frontend (SPA)                                     |
+|    - Rutas /api/* (FastAPI)                                                 |
+|  Proceso 2: Worker del pipeline de IA (mismo proceso, tarea asincrona)      |
+|  Persistencia:  app.db (SQLite)   |   uploads/ (archivos)                  |
+|  Recursos externos:  api.openai.com (opcional, si API_KEY configurada)      |
++-----------------------------------------------------------------------------+
+@ENDPRE
+@B Especificación del despliegue:
+@LI El comando de arranque es uvicorn app.main:app --reload ejecutado desde el directorio backend, precedido de la instalación de requirements.txt.
+@LI El frontend se sirve desde el mismo servidor con StaticFiles, evitando configuración de CORS en el despliegue base; la API soporta CORS restringido por si se sirve separadamente.
+@LI Los archivos se almacenan en backend/uploads (directorio configurable).
+@LI La base de datos se crea automáticamente al iniciar por el esquema de SQLAlchemy.
+@LI El despliegue a un servidor en Internet es fuera de alcance de este proyecto.
+@PB
+
+@H1 9.11 Diagramas de secuencia
+@P Se describen los flujos principales en forma textual, manteniendo el detalle de actores y sistemas. Cada escenario corresponde a un caso de uso del análisis y será reproducido como diagrama de secuencia formal (PlantUML) en la carpeta de imágenes.
+@B Escenario 1. Registrar usuario (CU-001)
+@PRE
+1. Usuario -> Frontend: solicita registro (email y contrasena)
+2. Frontend -> API: POST /api/auth/register (JSON)
+3. API -> BD: buscar email existente
+4. API: validar formato y unicidad (si email existe -> error 400)
+5. API: cifrar contrasena con bcrypt y crear usuario (rol cliente)
+6. API -> Frontend: 201 creado
+7. Frontend -> Usuario: confirmacion y redireccion a login
+@ENDPRE
+@B Escenario 2. Cargar y procesar documento (CU-006 y CU-010)
+@PRE
+1. Usuario -> Frontend: seleccionar archivo y repositorio, y enviar
+2. Frontend -> API: POST /api/documents/upload (multipart)
+3. API: validar extension y tamano (PDF/DOCX/TXT, <=10MB)
+4. API -> BD: crear Document (estado processing)
+5. API -> disco: guardar archivo en uploads/
+6. API -> Frontend: 201 con documento en processing
+7. API -> documentos: ejecutar pipeline (CU-010) de forma asincrona
+8. documentos -> pdf_parser: extraer texto
+9. documentos -> analyzer: clasificar, resumir, extraer informacion
+10. documentos -> embedding: chunks y embeddings (indice en memoria)
+11. documentos -> BD: actualizar estado a indexed (o failed) y AILog
+12. Frontend -> API: GET /api/documents (estado actualizado visible)
+@ENDPRE
+@B Escenario 3. Consulta en lenguaje natural (CU-012)
+@PRE
+1. Usuario -> Frontend: escribe pregunta en el chat
+2. Frontend -> API: POST /api/chat/ (JSON con pregunta)
+3. API -> rag_engine: normalizar pregunta
+4. rag_engine -> indice: recuperar top-5 chunks relevantes
+5. rag_engine: verificar evidencia (si no hay -> respuesta sin resultado)
+6. rag_engine -> OpenAI (opcional): contexto + pregunta
+7. rag_engine -> API: respuesta con fragmentos y fuentes
+8. API -> Frontend: 200 JSON {answer, sources, mode}
+9. Frontend -> Usuario: muestra respuesta y citas
+@ENDPRE
+@B Escenario 4. Búsqueda en el contenido (CU-011)
+@PRE
+1. Usuario -> Frontend: escribe termino a buscar
+2. Frontend -> API: GET /api/chat/search?q=termino
+3. API -> rag_engine: buscar termino en los documentos indexados del usuario
+4. rag_engine: devolver fragmentos coincidentes con documento
+5. API -> Frontend: 200 JSON lista de resultados
+@ENDPRE
+@B Escenario 5. Monitoreo y registro de errores (CU-014)
+@PRE
+1. Pipeline -> ErrorLog: registrar error (documento, codigo, mensaje, fecha)
+2. Admin -> Frontend: abre el panel de monitoreo
+3. Frontend -> API: GET /api/monitoring/logs (Bearer admin)
+4. API -> BD: consultar estados y errores
+5. API -> Frontend: 200 JSON con registros
+6. Frontend -> Admin: vista de estado y errores
+@ENDPRE
+@B Escenario 6. Eliminar documento (CU-009)
+@PRE
+1. Usuario -> Frontend: selecciona documento y confirma eliminacion
+2. Frontend -> API: DELETE /api/documents/{id}
+3. API: verificar propiedad del documento (owner_id)
+4. API -> disco: borrar archivo fisico
+5. API -> indice: remover chunks del documento
+6. API -> BD: eliminar registro (Document, extracciones y AILog)
+7. API -> Frontend: 204 sin contenido
+@ENDPRE
+@PB
+
+@H1 9.12 Modelo entidad-relación
+@P Se presenta el modelo de datos en forma compacta y textual. La imagen formal del diagrama entidad-relación se incluirá como anexo. Las entidades marcadas como (nuevo) se implementarán en la FASE 4 según la auditoría.
+@B Entidades y atributos:
+@LI User (id, email, hashed_password, role, created_at).
+@LI Repository (nuevo) (id, name, owner_id FK User, created_at).
+@LI Category (nuevo) (id, name, description, default_flag).
+@LI Document (id, owner_id FK User, repository_id FK Repository nullable, category_id FK Category nullable, original_filename, stored_name, file_path, file_size, mime_type, status, content_summary, extracted_text, uploaded_at, processed_at).
+@LI DocumentExtraction (nuevo) (id, document_id FK Document, field_name, field_value, extraction_type, timestamp).
+@LI AILog (id, document_id FK Document nullable, operation_type, tokens_used, processing_time_ms, timestamp).
+@LI ErrorLog (nuevo) (id, document_id FK Document nullable, error_code, message, level, created_at).
+@B Relaciones:
+@LI User 1-N Repository (owner).
+@LI User 1-N Document (owner).
+@LI Repository 1-N Document (nullable: documento sin repositorio permitido).
+@LI Category 1-N Document (nullable; documento sin categoria al cargar).
+@LI Document 1-N DocumentExtraction.
+@LI Document 1-N AILog (nullable si la operacion no aplica).
+@LI Document 1-N ErrorLog.
+@P Los identificadores son enteros (INTEGER autoincrementales en SQLite; BIGSERIAL en PostgreSQL). Las llaves foráneas se declaran con ON DELETE CASCADE para extracciones, AI logs y error logs cuando se elimina el documento, salvo el repositorio (REPOSITORY RESTRICT para evitar borrar repositorios con dependencias peligrosas, resuelto por validación en la API).
+@PB
+
+@H1 9.13 Diccionario de datos
+@B User
+@TABLE
+@HDR Campo | Tipo | Nulo | Descripción
+@ROW id | INTEGER PK | No | Identificador único del usuario.
+@ROW email | VARCHAR(255) UNIQUE | No | Correo electrónico de acceso; sin espacios, en minúsculas.
+@ROW hashed_password | VARCHAR(255) | No | Hash bcrypt de la contraseña; nunca texto plano.
+@ROW role | VARCHAR(20) | No | Rol del usuario: cliente o administrador (por defecto cliente).
+@ROW created_at | DATETIME | No | Fecha y hora de creación del registro.
+@ENDT
+@B Repository (nuevo)
+@TABLE
+@HDR Campo | Tipo | Nulo | Descripción
+@ROW id | INTEGER PK | No | Identificador único del repositorio.
+@ROW name | VARCHAR(120) | No | Nombre del repositorio; único por usuario (validado por API).
+@ROW owner_id | INTEGER FK User.id | No | Propietario del repositorio.
+@ROW created_at | DATETIME | No | Fecha de creación.
+@ENDT
+@B Category (nuevo)
+@TABLE
+@HDR Campo | Tipo | Nulo | Descripción
+@ROW id | INTEGER PK | No | Identificador único de la categoría.
+@ROW name | VARCHAR(80) UNIQUE | No | Nombre: académico, técnico, legal, administrativo o general.
+@ROW description | VARCHAR(255) | Sí | Descripción de la categoría.
+@ROW default_flag | BOOLEAN | No | Indica si es la categoría por defecto ("general").
+@ENDT
+@B Document
+@TABLE
+@HDR Campo | Tipo | Nulo | Descripción
+@ROW id | INTEGER PK | No | Identificador único del documento.
+@ROW owner_id | INTEGER FK User.id | No | Usuario propietario del documento.
+@ROW repository_id | INTEGER FK Repository.id | Sí | Repositorio al que pertenece, si aplica.
+@ROW category_id | INTEGER FK Category.id | Sí | Categoría asignada por la clasificación.
+@ROW original_filename | VARCHAR(255) | No | Nombre original del archivo cargado.
+@ROW stored_name | VARCHAR(100) | No | Nombre físico seguro en disco.
+@ROW file_path | VARCHAR(500) | No | Ruta del archivo en uploads/.
+@ROW file_size | INTEGER | No | Tamaño en bytes.
+@ROW mime_type | VARCHAR(100) | No | Tipo MIME declarado del archivo.
+@ROW status | VARCHAR(20) | No | Estado: processing, indexed o failed.
+@ROW content_summary | TEXT | Sí | Resumen generado por IA.
+@ROW extracted_text | TEXT | Sí | Texto extraído del documento.
+@ROW uploaded_at | DATETIME | No | Fecha y hora de carga.
+@ROW processed_at | DATETIME | Sí | Fecha y hora de finalización del procesamiento.
+@ENDT
+@B DocumentExtraction (nuevo)
+@TABLE
+@HDR Campo | Tipo | Nulo | Descripción
+@ROW id | INTEGER PK | No | Identificador único de la extracción.
+@ROW document_id | INTEGER FK Document.id | No | Documento del cual se extrajo el campo.
+@ROW field_name | VARCHAR(80) | No | Nombre del campo (ej. autor, año, institución).
+@ROW field_value | TEXT | No | Valor extraído.
+@ROW extraction_type | VARCHAR(30) | No | Tipo de documento al que corresponde el esquema.
+@ROW timestamp | DATETIME | No | Fecha de la extracción.
+@ENDT
+@B AILog
+@TABLE
+@HDR Campo | Tipo | Nulo | Descripción
+@ROW id | INTEGER PK | No | Identificador único del registro.
+@ROW document_id | INTEGER FK Document.id | Sí | Documento relacionado, si aplica.
+@ROW operation_type | VARCHAR(50) | No | Operación: extraccion, clasificacion, resumen, embedding, pregunta.
+@ROW tokens_used | INTEGER | Sí | Tokens consumidos (0 en modo local).
+@ROW processing_time_ms | INTEGER | Sí | Duración de la operación en milisegundos.
+@ROW timestamp | DATETIME | No | Fecha y hora del registro.
+@ENDT
+@B ErrorLog (nuevo)
+@TABLE
+@HDR Campo | Tipo | Nulo | Descripción
+@ROW id | INTEGER PK | No | Identificador único del registro.
+@ROW document_id | INTEGER FK Document.id | Sí | Documento que provocó el error, si aplica.
+@ROW error_code | VARCHAR(50) | No | Código del error (ej. PDF_NO_TEXT, EXT_NOT_SUPPORTED).
+@ROW message | TEXT | No | Descripción legible del error.
+@ROW level | VARCHAR(20) | No | Nivel de severidad (error, warning).
+@ROW created_at | DATETIME | No | Fecha y hora del error.
+@ENDT
+@PB
+
+@H1 9.14 Diseño de la API
+@P La API es REST bajo /api, responde JSON, usa autenticación Bearer (JWT) salvo los endpoints públicos de registro e inicio de sesión, y devuelve códigos HTTP estándar. Cada endpoint referencia sus requisitos (RF) y casos de uso (CU) para la trazabilidad.
+@P Nota de consistencia: los endpoints marcados (nuevo) corresponden a funcionalidad no presente en la auditoría de la FASE 1 y se implementarán en la FASE 4.
+@H2 9.14.1 Autenticación
+@B POST /api/auth/register (público)
+@LI Propósito: registrar un usuario con rol cliente (CU-001).
+@LI Body (JSON): { email, password }.
+@LI Respuesta 201: { id, email, role, token }.
+@LI Errores: 400 email o contraseña inválidos o email duplicado.
+@LI Requisitos: RF-001; regla RB-004.
+@B POST /api/auth/login (público)
+@LI Propósito: iniciar sesión y obtener token JWT (CU-002).
+@LI Body (form): username (email), password.
+@LI Respuesta 200: { access_token, token_type: bearer, user: { id, email, role } }.
+@LI Errores: 401 credenciales incorrectas.
+@LI Requisitos: RF-001.
+@B GET /api/auth/me (autenticado)
+@LI Propósito: obtener el perfil del usuario autenticado.
+@LI Respuesta 200: { id, email, role, created_at }.
+@LI Errores: 401 token ausente o vencido.
+@LI Requisitos: RF-001, RF-002.
+@H2 9.14.2 Repositorios (nuevos)
+@B POST /api/repositories/ (autenticado)
+@LI Propósito: crear un repositorio (CU-004).
+@LI Body (JSON): { name }.
+@LI Respuesta 201: { id, name, created_at }.
+@LI Errores: 400 nombre vacío o duplicado en el usuario.
+@LI Requisitos: RF-003; historia HU-001.
+@B GET /api/repositories/ (autenticado)
+@LI Propósito: listar repositorios del usuario con conteo de documentos.
+@LI Respuesta 200: [ { id, name, document_count, created_at } ].
+@LI Errores: 401.
+@LI Requisitos: RF-003; historia HU-001.
+@B PATCH /api/repositories/{id} (autenticado)
+@LI Propósito: renombrar un repositorio propio (CU-005).
+@LI Body (JSON): { name }.
+@LI Respuesta 200: { id, name }.
+@LI Errores: 400 nombre inválido; 404 repositorio inexistente; 403 no es propietario.
+@LI Requisitos: RF-004; historia HU-001.
+@B DELETE /api/repositories/{id} (autenticado)
+@LI Propósito: eliminar un repositorio propio previa confirmación de dependencias (CU-005).
+@LI Respuesta 200: { deleted: true, orphan_documents: N }.
+@LI Errores: 404; 403; 409 si la eliminación es rechazada por dependencias.
+@LI Requisitos: RF-004; historia HU-001.
+@H2 9.14.3 Documentos
+@B POST /api/documents/upload (autenticado; multipart)
+@LI Propósito: cargar un documento en un repositorio e iniciar el procesamiento (CU-006).
+@LI Parámetros: campo file (archivo); campo repository_id (opcional).
+@LI Respuesta 201: objeto Document con estado processing.
+@LI Errores: 400 extensión no soportada o archivo mayor a 10 MB; 404 repositorio inexistente.
+@LI Requisitos: RF-005, RF-009; reglas RB-001, RB-002; historia HU-002.
+@B GET /api/documents/ (autenticado)
+@LI Propósito: listar documentos del usuario con filtros por repositorio, categoría y estado, y búsqueda por nombre (CU-007).
+@LI Parámetros (query): repository_id, category, status, search.
+@LI Respuesta 200: lista de documentos con metadatos, estado, categoría y resumen.
+@LI Errores: 401.
+@LI Requisitos: RF-006, RF-018, RF-019; historia HU-004.
+@B GET /api/documents/{id} (autenticado)
+@LI Propósito: obtener el detalle de un documento propio (CU-007).
+@LI Respuesta 200: documento completo, categoría, resumen, información extraída y estado.
+@LI Errores: 404; 403 no es propietario.
+@LI Requisitos: RF-006, RF-019; historia HU-004.
+@B GET /api/documents/{id}/download (autenticado)
+@LI Propósito: descargar el archivo original (CU-008).
+@LI Respuesta 200: FileResponse con el nombre original.
+@LI Errores: 404; 403.
+@LI Requisitos: RF-007; historia HU-004.
+@B DELETE /api/documents/{id} (autenticado)
+@LI Propósito: eliminar documento propio, su archivo y su índice (CU-009).
+@LI Respuesta 204 sin contenido.
+@LI Errores: 404; 403.
+@LI Requisitos: RF-008; regla RB-010; historia HU-005.
+@B GET /api/documents/stats/summary (autenticado)
+@LI Propósito: calcular los indicadores del dashboard (CU-013).
+@LI Respuesta 200: { total_documents, processed, questions_answered, time_saved_estimate, by_category, by_status }.
+@LI Errores: 401.
+@LI Requisitos: RF-016; historia HU-008.
+@H2 9.14.4 Chat y búsqueda
+@B GET /api/chat/search?q=termino (autenticado)
+@LI Propósito: buscar términos en el contenido indexado del usuario (CU-011).
+@LI Respuesta 200: [ { document_id, filename, snippet, score } ].
+@LI Errores: 400 consulta vacía.
+@LI Requisitos: RF-014; historia HU-006.
+@B POST /api/chat/ (autenticado; JSON)
+@LI Propósito: responder una pregunta en lenguaje natural usando RAG (CU-012).
+@LI Body (JSON): { message }.
+@LI Respuesta 200: { answer, mode (demo/llm), sources: [ { document_id, filename, snippet } ] }.
+@LI Errores: 400 mensaje vacío.
+@LI Requisitos: RF-015; regla RB-008; historia HU-007.
+@H2 9.14.5 Monitoreo (solamente administrador)
+@B GET /api/monitoring/logs (admin)
+@LI Propósito: consultar estados y errores de procesamiento (CU-014).
+@LI Parámetros (query): status, limit.
+@LI Respuesta 200: [ { id, document_id, error_code, message, level, created_at } ].
+@LI Errores: 403 rol no autorizado.
+@LI Requisitos: RF-017; historia HU-009.
+@B GET /api/monitoring/ai-logs (admin)
+@LI Propósito: consultar los registros de operaciones de IA (CU-014).
+@LI Respuesta 200: [ { id, document_id, operation_type, tokens_used, processing_time_ms, timestamp } ].
+@LI Errores: 403 rol no autorizado.
+@LI Requisitos: RF-017; historia HU-009.
+@H2 9.14.6 Configuración (solamente administrador)
+@B GET /api/config (admin)
+@LI Propósito: consultar la configuración del sistema.
+@LI Respuesta 200: { model, chunk_size, overlap } (los secretos nunca se devuelven).
+@LI Errores: 403.
+@LI Requisitos: RF-020; historia HU-010.
+@B PUT /api/config (admin; JSON)
+@LI Propósito: actualizar parámetros del sistema.
+@LI Body (JSON): { model?, chunk_size?, overlap? }.
+@LI Respuesta 200: configuración actualizada.
+@LI Errores: 403; 400 valores no válidos.
+@LI Requisitos: RF-020; historia HU-010.
+@H2 9.14.7 Códigos de error uniformes
+@LI 400 Bad Request: validación fallida con mensaje del campo.
+@LI 401 Unauthorized: token ausente, inválido o vencido.
+@LI 403 Forbidden: el usuario no es propietario o no tiene el rol.
+@LI 404 Not Found: recurso inexistente.
+@LI 409 Conflict: conflicto de dependencias (ej. eliminación de repositorio).
+@LI 500 Internal Server Error: con registro en ErrorLog y AILog, sin exponer detalles internos.
+@PB

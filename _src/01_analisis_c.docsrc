@@ -1,0 +1,71 @@
+@PB
+@H1 8.15 Priorización
+@P La priorización clasifica los requisitos en Alta, Media y Baja según su aporte al cumplimiento del alcance funcional mínimo de la guía y al valor demostrable del flujo de IA.
+@TABLE
+@HDR Prioridad | Requisitos | Justificación
+@ROW Alta | RF-001, RF-002, RF-005, RF-006, RF-008, RF-009, RF-010, RF-011, RF-014, RF-015, RF-017 | Corresponden al núcleo del sistema: acceso, gestión de archivos y flujo real de IA (extracción, clasificación, resumen, búsqueda, preguntas, estados y errores).
+@ROW Media | RF-003, RF-004, RF-007, RF-012, RF-013, RF-016, RF-018, RF-019 | Optimizan la organización (repositorios), la explotación del análisis (información extraída y detalle) y el seguimiento (dashboard y estados).
+@ROW Baja | RF-020 | Configuración de parámetros de IA por interfaz; se puede cubrir con variables de entorno en una primera entrega.
+@ENDT
+@P La asignación de prioridades se usará en la planificación de la FASE 4 (Desarrollo) para ordenar la implementación y en la FASE 6 (Pruebas) para priorizar la cobertura de casos de prueba.
+@PB
+
+@H1 8.16 Riesgos
+@TABLE
+@HDR ID | Riesgo | Probabilidad | Impacto | Nivel | Mitigación
+@ROW R-01 | Cambiar la estrategia de IA después de definir requisitos (retrabajo en documentación) | Media | Alto | Alto | Fijar la decisión D-02 en la FASE 3; dejar capas de servicio (embedding/generación) desacopladas.
+@ROW R-02 | No poder ejecutar Python en el ambiente de validación (sin evidencia real para pruebas) | Media | Alto | Alto | Documentar la instalación paso a paso; preparar scripts de prueba automatizables; usar el entorno local del equipo.
+@ROW R-03 | Mantener el frontend como prototipo desconectado y documentarlo como funcional | Media | Alto | Alto | Requisitos RF-005..RF-019 exigen integración UI-API; verificación en pruebas de aceptación.
+@ROW R-04 | Filtración de secretos (API keys) en el repositorio de Git | Baja | Alto | Medio | .gitignore para .env; plantilla .env.example; revisión previa a cada commit.
+@ROW R-05 | Documentos PDF escaneados sin capa de texto caen a estado "failed" | Media | Medio | Medio | Limitación declarada (8.7); manejo de error explícito; OCR como mejora futura documentada.
+@ROW R-06 | El índice vectorial en memoria no persiste entre reinicios | Media | Medio | Medio | Reconstrucción del índice al iniciar el servicio (RF-013); persistencia como mejora (vector DB) documentada.
+@ROW R-07 | Costos de API de IA fuera del presupuesto durante las pruebas | Media | Medio | Medio | Modo demo sin API key funcional por defecto; la API key de OpenAI es opcional.
+@ROW R-08 | Imprecisiones de la clasificación por reglas con documentos ambiguos | Media | Bajo | Medio | Umbral de categoría; categoría "general" de respaldo; evaluación con los 30 documentos de prueba.
+@ENDT
+@PB
+
+@H1 8.17 Matriz de trazabilidad inicial
+@P La matriz relaciona cada requisito con la historia de usuario, el caso de uso, la funcionalidad y el componente que lo materializa. Esta matriz será ampliada en la FASE 9 (Matriz de trazabilidad final) con la evidencia de prueba de cada requisito.
+@TABLE
+@HDR Requisito | Historia | Caso de uso | Funcionalidad | Componente
+@ROW RF-001 | HU-010 | CU-001, CU-002, CU-003 | Registro, login, logout | api/auth.py + frontend
+@ROW RF-002 | HU-010 | CU-001, CU-015 | Roles y protección de rutas | api/deps.py + models/user.py
+@ROW RF-003 | HU-001 | CU-004 | Crear repositorio | models (repository) + api
+@ROW RF-004 | HU-001 | CU-005 | Renombrar/eliminar repositorio | models (repository) + api
+@ROW RF-005 | HU-002 | CU-006 | Carga de archivos | api/documents.py
+@ROW RF-006 | HU-004 | CU-007 | Listado y detalle | api/documents.py
+@ROW RF-007 | HU-004 | CU-008 | Descarga | api/documents.py (FileResponse)
+@ROW RF-008 | HU-005 | CU-009 | Eliminación | api/documents.py + services/rag_engine.py
+@ROW RF-009 | HU-003 | CU-010 | Extracción de texto | services/pdf_parser.py
+@ROW RF-010 | HU-003 | CU-010 | Clasificación | services/document_analyzer.py
+@ROW RF-011 | HU-003 | CU-010 | Resumen | services/document_analyzer.py
+@ROW RF-012 | HU-004 | CU-010 | Extracción de información | services/extractor.py (nuevo)
+@ROW RF-013 | HU-003 | CU-010 | Chunks y embeddings | services/embedding.py + rag_engine.py
+@ROW RF-014 | HU-006 | CU-011 | Búsqueda en contenido | services/rag_engine.py + api/ai_chat.py
+@ROW RF-015 | HU-007 | CU-012 | Chat RAG | services/rag_engine.py + api/ai_chat.py
+@ROW RF-016 | HU-008 | CU-013 | Dashboard | api/documents.py (stats) + frontend
+@ROW RF-017 | HU-009 | CU-014 | Registro de errores/estados | models/ai_log.py + models (error_log) + servicios
+@ROW RF-018 | HU-009 | CU-014 | Visualización de estados | frontend + api
+@ROW RF-019 | HU-004 | CU-007 | Detalle de análisis | frontend + api/documents.py
+@ROW RF-020 | HU-010 | CU-015 | Configuración del sistema | core/config.py + frontend
+@ENDT
+@P Nota: los componentes marcados como "(nuevo)" corresponden a funcionalidades que la auditoría determinó como FALTANTES o PARCIALES y que serán implementadas en la FASE 4 (Desarrollo) y la FASE 5 (IA), de acuerdo con la línea base definida en este documento.
+@PB
+
+@H1 Conclusiones
+@P El análisis presentado formaliza la necesidad y el alcance del sistema DocuPasion a partir de la auditoría real del código existente. Se identificaron 20 requisitos funcionales, 13 requisitos no funcionales y 11 reglas de negocio, todos trazables a historias de usuario y casos de uso. El flujo central del sistema - archivo, extracción, procesamiento IA, análisis, almacenamiento, búsqueda y respuesta - queda definido en los requisitos RF-009 a RF-015 y su priorización confirma que constituye el núcleo de la primera entrega.
+@P El documento también fija las decisiones de línea base (D-01 a D-04) como propuestas pendientes de ratificación y declara explícitamente las exclusiones (OCR, edición, aplicaciones móviles, entre otras) para alinear las expectativas de los interesados. Con esto, el proyecto queda preparado para la FASE 3 (Diseño), donde estas decisiones se traducirán en arquitectura, modelos de datos, diseño de API, interfaces y diagramas.
+@P La principal expectativa de esta fase es que los interesados ratifiquen o ajusten las decisiones D-01 a D-04 y confirme la disponibilidad de un entorno Python para ejecutar el sistema y generar la evidencia de pruebas en las fases siguientes.
+@PB
+
+@H1 Referencias
+@LI Python Software Foundation. Python Documentation. Disponible en: https://docs.python.org/
+@LI FastAPI. FastAPI Documentation. Disponible en: https://fastapi.tiangolo.com/
+@LI SQLAlchemy. SQLAlchemy Documentation. Disponible en: https://docs.sqlalchemy.org/
+@LI OpenAI. OpenAI API Reference (Embeddings y Chat Completions). Disponible en: https://platform.openai.com/docs/
+@LI Lewis, P., et al. Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. arXiv:2005.11401 (2020).
+@LI PyPDF2. PyPDF2 Documentation. Disponible en: https://pypi.org/project/PyPDF2/
+@LI python-docx. python-docx Documentation. Disponible en: https://python-docx.readthedocs.io/
+@LI Microsoft. Formato Rich Text Format (RTF) Specification 1.9.1. Disponible en: https://www.microsoft.com/en-us/download/details.aspx?id=10725
+@LI Pressman, R. y Maxim, B. Ingeniería del Software: Un enfoque práctico. 8a edición. McGraw-Hill, 2015.
+@LI ISO/IEC/IEEE 12207. Processes in the software life cycle. 2017.

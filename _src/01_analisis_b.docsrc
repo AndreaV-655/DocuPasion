@@ -1,0 +1,232 @@
+@PB
+@H1 8.10 Requisitos funcionales
+@P Los requisitos funcionales definen el comportamiento del sistema. Cada requisito es identificado, claro, verificable, medible cuando corresponde y trazable (se vincula con historias de usuario, casos de uso y funcionalidades en la sección 8.17).
+@TABLE
+@HDR ID | Nombre | Descripción y criterio de verificación | Prioridad
+@ROW RF-001 | Autenticación de usuarios | El sistema permite registrar, iniciar y cerrar sesión con credenciales (email y contraseña). Verificación: tras registrarse e iniciar sesión, el sistema emite un token JWT que protege todas las operaciones. | Alta
+@ROW RF-002 | Control de acceso por roles | El sistema distingue roles cliente y administrador y restringe funciones según el rol. Verificación: un cliente no puede acceder a la configuración; el registro propio siempre crea cliente y solo un administrador asigna rol admin. | Alta
+@ROW RF-003 | Creación de repositorios | El usuario autenticado puede crear repositorios (carpetas). Verificación: se crea un repositorio con nombre y queda visible en el listado. | Alta
+@ROW RF-004 | Administración de repositorios | El usuario puede renombrar y eliminar repositorios propios. Verificación: al eliminar, sus documentos quedan registrados como sin repositorio o se rechaza la operación si existen dependencias; se informa el resultado. | Media
+@ROW RF-005 | Carga de archivos | El usuario puede cargar documentos PDF, DOCX y TXT de hasta 10 MB en un repositorio. Verificación: formatos no soportados y archivos mayores al límite se rechazan con mensaje claro. | Alta
+@ROW RF-006 | Consulta de documentos | El usuario puede listar y consultar los metadatos (nombre, fecha, tamaño, estado, categoría, resumen) de sus documentos. Verificación: el listado refleja solo los documentos del usuario autenticado. | Alta
+@ROW RF-007 | Descarga de archivos | El usuario puede descargar el documento original desde el repositorio. Verificación: el archivo descargado coincide con el original. | Media
+@ROW RF-008 | Eliminación de archivos | El usuario puede eliminar un documento propio (registro, archivo físico e índice). Verificación: el documento desaparece del listado y del índice de búsqueda. | Alta
+@ROW RF-009 | Extracción de texto automática | El sistema extrae el contenido de documentos PDF, DOCX y TXT al procesarlos. Verificación: el texto extraído se almacena y queda disponible para clasificación, resumen e indexación. | Alta
+@ROW RF-010 | Clasificación automática | El sistema asigna automáticamente una de al menos cuatro categorías (académico, técnico, legal, administrativo) o la categoría "general" si no alcanza umbral. Verificación: con 30 documentos de prueba se clasifica correctamente al menos el 80%. | Alta
+@ROW RF-011 | Resumen automático | El sistema genera un resumen por documento procesado. Verificación: cada documento indexado muestra un resumen no vacío. | Alta
+@ROW RF-012 | Extracción de información relevante | El sistema extrae campos específicos de al menos tres tipos de documentos (por ejemplo: autor, año e institución en académicos; partes, cláusulas y fechas en legales; requisitos, arquitectura y tecnologías en técnicos). Verificación: los campos extraídos se muestran por documento. | Media
+@ROW RF-013 | Indexación vectorial | El sistema divide el texto en chunks con superposición y genera embeddings para búsqueda semántica. Verificación: el índice se crea al procesar el documento y se reconstruye al iniciar el servicio. | Media
+@ROW RF-014 | Búsqueda en el contenido | El usuario puede buscar palabras clave dentro del contenido documental y obtener fragmentos coincidentes. Verificación: una búsqueda devuelve los documentos y fragmentos donde aparece el término. | Alta
+@ROW RF-015 | Consulta en lenguaje natural | El usuario puede hacer preguntas en español y obtener respuestas fundamentadas en los documentos indexados (RAG). Verificación: la respuesta cita los documentos fuente; si no hay evidencia, el sistema lo indica. | Alta
+@ROW RF-016 | Dashboard con indicadores | El sistema muestra total de documentos, procesados por IA, preguntas respondidas, tiempo estimado ahorrado, distribución por categoría y por estado. Verificación: los indicadores corresponden a los datos del repositorio del usuario. | Media
+@ROW RF-017 | Registro de errores y estados | El sistema registra los estados de procesamiento (processing, indexed, failed) y los errores con fecha, documento y descripción. Verificación: un documento corrupto queda en estado "failed" y el error queda registrado. | Alta
+@ROW RF-018 | Visualización de estados | El usuario puede ver el estado de procesamiento de cada documento en la interfaz. Verificación: cada fila del listado muestra una insignia de estado. | Media
+@ROW RF-019 | Visualización de análisis | El usuario puede ver categoría, resumen e información extraída por documento. Verificación: la vista de detalle del documento presenta estos tres bloques. | Media
+@ROW RF-020 | Configuración del sistema (admin) | El administrador puede configurar parámetros del sistema (claves de IA, modelo, tamaño de chunks). Verificación: los cambios se aplican y persisten. | Baja
+@ENDT
+@PB
+
+@H1 8.11 Requisitos no funcionales
+@TABLE
+@HDR ID | Categoría | Nombre | Descripción y criterio de verificación
+@ROW RNF-001 | Seguridad | Cifrado de contraseñas | Las contraseñas se almacenan cifradas con bcrypt; nunca en texto plano. Verificación: auditoría de la tabla de usuarios. | Alta
+@ROW RNF-002 | Seguridad | Tokens de sesión | Las sesiones usan tokens JWT con expiración configurable. Verificación: un token vencido no concede acceso. | Alta
+@ROW RNF-003 | Seguridad | Protección de credenciales | Las API keys y secretos se cargan desde variables de entorno (.env) y no se publican en el repositorio. Verificación: revisión de .gitignore y del repositorio. | Alta
+@ROW RNF-004 | Seguridad | Aislamiento entre usuarios | Ningún usuario puede leer, descargar, modificar ni eliminar documentos de otro usuario. Verificación: pruebas con dos cuentas. | Alta
+@ROW RNF-005 | Rendimiento | Respuesta de consultas | Las operaciones ligeras (lista, detalle, búsqueda por clave) responden en menos de 2 segundos con un repositorio de prueba de 30 documentos. Verificación: medición manual y registros de tiempos. | Media
+@ROW RNF-006 | Rendimiento | Procesamiento documental | La extracción, clasificación y resumen de un PDF de hasta 10 MB concluyen en un tiempo acotado y el estado refleja el resultado. Verificación: prueba con los 30 documentos. | Media
+@ROW RNF-007 | Disponibilidad | Reproducibilidad | El sistema se ejecuta con pocos comandos documentados (instalar dependencias, configurar .env, iniciar uvicorn) en Windows o Linux. Verificación: guía de instalación reproducida en un equipo limpio. | Media
+@ROW RNF-008 | Usabilidad | Idioma y simplicidad | La interfaz está en español y puede ser utilizada por una persona sin conocimientos de programación tras una instrucción breve. Verificación: pruebas de usuario con perfiles no técnicos. | Media
+@ROW RNF-009 | Escalabilidad | Migración de BD | El modelo de datos permite migrar de SQLite a PostgreSQL sin rediseño estructural. Verificación: uso de SQLAlchemy con URL configurable. | Media
+@ROW RNF-010 | Mantenibilidad | Modularidad | El código se organiza por capas (api, core, models, services) y funciones de propósito único. Verificación: revisión de arquitectura y código. | Media
+@ROW RNF-011 | Compatibilidad | Navegadores | La interfaz funciona en los navegadores modernos (Chrome, Edge, Firefox) en sus últimas versiones. Verificación: prueba de despliegue local. | Media
+@ROW RNF-012 | Privacidad | Datos de prueba | Los documentos de prueba no contienen datos personales reales sin autorización; se usan datos sintéticos. Verificación: revisión del conjunto de 30 documentos. | Alta
+@ROW RNF-013 | Integridad | Reconstrucción de la BD | La base de datos puede recrearse desde cero con un script documentado. Verificación: borrar y recrear la BD siguiendo el manual. | Media
+@ENDT
+@PB
+
+@H1 8.12 Reglas de negocio
+@TABLE
+@HDR ID | Regla de negocio
+@ROW RB-001 | Solo se permiten los formatos PDF, DOCX y TXT. Cualquier otra extensión se rechaza.
+@ROW RB-002 | El tamaño máximo por archivo es de 10 MB.
+@ROW RB-003 | Un usuario administra únicamente sus propios repositorios y documentos; el sistema valida la propiedad en cada operación.
+@ROW RB-004 | El rol asignado por defecto al registrarse es "cliente". El rol "admin" solo puede asignarlo otro administrador mediante el módulo de usuarios.
+@ROW RB-005 | Los estados de un documento siguen la secuencia: processing, luego indexed o failed. No se permite otro flujo.
+@ROW RB-006 | Un documento sin texto extraído no puede clasificarse, resumirse ni indexarse; pasa al estado "failed".
+@ROW RB-007 | La categoría por defecto es "general" cuando el clasificador por reglas no supera el umbral de coincidencia.
+@ROW RB-008 | El chat RAG responde únicamente con información proveniente de los documentos indexados; si no hay evidencia, informa que no encontró respuesta.
+@ROW RB-009 | La indexación divide el texto en chunks con tamaño y superposición configurables; los valores por defecto son 512 tokens y 64 de solapamiento.
+@ROW RB-010 | Al eliminar un documento se eliminan también su archivo físico y su entrada del índice de búsqueda.
+@ROW RB-011 | El registro de errores y de operaciones de IA (AILog) es de solo escritura desde el sistema; los usuarios no lo modifican.
+@ENDT
+@PB
+
+@H1 8.13 Historias de usuario
+@B HU-001 - Gestión de repositorios (administrador)
+@P Como administrador, quiero crear, renombrar y eliminar repositorios, para organizar los documentos de los usuarios del sistema.
+@B Criterios de aceptación:
+@LI Dado un usuario con rol admin y sesión iniciada, cuando selecciono "Nuevo repositorio" e ingreso un nombre válido, entonces el repositorio se crea y aparece en el listado.
+@LI Dado un repositorio existente propio, cuando lo elimino, entonces el repositorio y sus documentos asociados se eliminan tras confirmación, o se informa de dependencias.
+@B HU-002 - Carga de documentos (cliente)
+@P Como cliente, quiero cargar un documento PDF, DOCX o TXT en un repositorio, para tenerlo disponible para análisis y consulta.
+@B Criterios de aceptación:
+@LI Dado un archivo con extensión permitida y tamaño menor o igual a 10 MB, cuando lo cargo, entonces el sistema inicia el procesamiento y el documento aparece con estado "processing".
+@LI Dado un archivo con extensión no permitida o mayor a 10 MB, cuando intento cargarlo, entonces el sistema rechaza la carga con un mensaje claro.
+@B HU-003 - Seguimiento del procesamiento (cliente)
+@P Como cliente, quiero conocer el estado de procesamiento de cada documento, para saber cuándo puedo consultarlo.
+@B Criterios de aceptación:
+@LI Dado un documento cargado, cuando su procesamiento concluye correctamente, entonces su estado cambia a "indexed".
+@LI Dado un documento cuyo texto no puede extraerse, cuando el procesamiento falla, entonces su estado cambia a "failed" y se registra el error.
+@B HU-004 - Consulta y descarga (cliente)
+@P Como cliente, quiero consultar y descargar mis documentos, para revisarlos cuando los necesite.
+@B Criterios de aceptación:
+@LI Dado un documento indexado, cuando lo selecciono, entonces veo sus metadatos, categoría, resumen e información extraída.
+@LI Dado un documento propio, cuando presiono "Descargar", entonces el archivo original se descarga correctamente.
+@B HU-005 - Eliminación de documentos (cliente)
+@P Como cliente, quiero eliminar documentos que ya no necesito, para mantener ordenado mi repositorio.
+@B Criterios de aceptación:
+@LI Dado un documento propio, cuando presiono "Eliminar" y confirmo, entonces el documento deja de aparecer en listados y búsquedas.
+@B HU-006 - Búsqueda en contenido (cliente)
+@P Como cliente, quiero buscar palabras clave dentro del contenido de mis documentos, para localizar rápidamente la información relevante.
+@B Criterios de aceptación:
+@LI Dado un término existente en el contenido, cuando lo busco, entonces el sistema devuelve los documentos y fragmentos coincidentes ordenados por relevancia.
+@LI Dado un término ausente, cuando lo busco, entonces el sistema informa que no hubo coincidencias.
+@B HU-007 - Preguntas en lenguaje natural (cliente)
+@P Como cliente, quiero hacer preguntas sobre el contenido de mis documentos, para obtener respuestas fundamentadas sin releer los archivos.
+@B Criterios de aceptación:
+@LI Dado un documento indexado con la información, cuando pregunto en español, entonces el sistema responde citando el documento fuente.
+@LI Dado un tema sin evidencia en el repositorio, cuando pregunto, entonces el sistema indica que no encontró respuesta fundamentada.
+@B HU-008 - Dashboard (cliente)
+@P Como cliente, quiero ver indicadores de mi repositorio, para conocer el estado general de mi información documental.
+@B Criterios de aceptación:
+@LI Cuando accedo al dashboard, entonces se muestran total de documentos, procesados, preguntas respondidas y tiempo estimado ahorrado, calculados sobre mis datos.
+@B HU-009 - Monitoreo (administrador)
+@P Como administrador, quiero ver los estados de procesamiento y errores, para detectar y corregir problemas.
+@B Criterios de aceptación:
+@LI Cuando un documento falla, entonces el sistema registra el error con fecha, documento y descripción, y el administrador puede consultarlo.
+@B HU-010 - Configuración del sistema (administrador)
+@P Como administrador, quiero configurar los parámetros de IA, para adaptar el sistema al presupuesto y la calidad deseados.
+@B Criterios de aceptación:
+@LI Cuando cambio la clave de IA o el tamaño de chunks, entonces los cambios se aplican a los nuevos procesamientos.
+@PB
+
+@H1 8.14 Casos de uso
+@B CU-001 - Registrar usuario
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Crear una cuenta con credenciales para acceder al sistema.
+@LI Precondiciones: No existir una cuenta con el mismo email.
+@LI Postcondiciones: Se crea el usuario con rol "cliente" (por defecto) y queda disponible para iniciar sesión.
+@LI Flujo principal: 1. El usuario solicita registro. 2. Ingresa email y contraseña. 3. El sistema valida formato y unicidad. 4. El sistema cifra la contraseña y crea el registro. 5. El sistema confirma el registro.
+@LI Flujos alternativos: 3a. Email duplicado: se informa el error y no se crea la cuenta. 3b. Formato inválido: se informa el error.
+@LI Excepciones: No se asigna rol admin en el registro público (regla RB-004).
+@LI Requisitos: RF-001, RF-002. Historias: HU-010.
+@LI Reglas de negocio: RB-004.
+@B CU-002 - Iniciar sesión
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Obtener un token de acceso válido.
+@LI Precondiciones: La cuenta debe existir y la contraseña debe coincidir.
+@LI Postcondiciones: Se emite un token JWT que autentica las operaciones.
+@LI Flujo principal: 1. El usuario ingresa email y contraseña. 2. El sistema verifica las credenciales. 3. El sistema emite y devuelve el token.
+@LI Flujos alternativos: 2a. Credenciales incorrectas: respuesta 401 sin revelar cuál campo falló.
+@LI Requisitos: RF-001.
+@B CU-003 - Cerrar sesión
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Finalizar la sesión del usuario.
+@LI Precondiciones: Sesión iniciada.
+@LI Postcondiciones: El token deja de utilizarse en el cliente.
+@LI Flujo principal: 1. El usuario solicita salir. 2. El cliente descarta el token y regresa a la pantalla de inicio de sesión.
+@LI Requisitos: RF-001.
+@B CU-004 - Crear repositorio
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Crear una carpeta de organización de documentos.
+@LI Precondiciones: Sesión iniciada y nombre válido.
+@LI Postcondiciones: El repositorio se crea asociado al usuario.
+@LI Flujo principal: 1. El usuario selecciona "Nuevo repositorio". 2. Ingresa el nombre. 3. El sistema valida y crea el repositorio. 4. El sistema confirma.
+@LI Flujos alternativos: 2a. Nombre vacío o duplicado dentro del usuario: se informa el error.
+@LI Requisitos: RF-003. Historias: HU-001.
+@B CU-005 - Administrar repositorio
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Renombrar o eliminar un repositorio propio.
+@LI Precondiciones: El repositorio debe pertenecer al usuario.
+@LI Postcondiciones: El repositorio queda actualizado o eliminado.
+@LI Flujo principal: 1. El usuario selecciona el repositorio. 2. Elige renombrar o eliminar. 3. Confirma la operación. 4. El sistema aplica el cambio.
+@LI Flujos alternativos: 3a. Eliminación con documentos asociados: el sistema solicita confirmación y describe el impacto.
+@LI Requisitos: RF-004. Historias: HU-001.
+@B CU-006 - Cargar documento
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Subir un archivo PDF, DOCX o TXT de hasta 10 MB a un repositorio.
+@LI Precondiciones: Sesión iniciada y repositorio seleccionado.
+@LI Postcondiciones: El documento se almacena, se crea el registro con estado "processing" y el procesamiento inicia.
+@LI Flujo principal: 1. El usuario selecciona el archivo. 2. El sistema valida extensión y tamaño. 3. El sistema guarda el archivo y crea el registro. 4. El sistema ejecuta el pipeline de IA. 5. El sistema actualiza el estado.
+@LI Flujos alternativos: 2a. Formato no soportado: rechazo con mensaje (RB-001). 2b. Tamaño mayor a 10 MB: rechazo (RB-002).
+@LI Excepciones: 4a. No se extrae texto: estado "failed" y registro del error (RB-006).
+@LI Requisitos: RF-005, RF-009. Historias: HU-002, HU-003.
+@B CU-007 - Consultar documentos
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Listar y ver el detalle de documentos propios.
+@LI Precondiciones: Sesión iniciada.
+@LI Postcondiciones: El usuario visualiza metadatos, categoría, resumen e información extraída.
+@LI Flujo principal: 1. El usuario abre el listado. 2. El sistema devuelve sus documentos. 3. El usuario selecciona uno y el sistema muestra el detalle.
+@LI Requisitos: RF-006, RF-019. Historias: HU-004.
+@B CU-008 - Descargar documento
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Obtener el archivo original de un documento propio.
+@LI Precondiciones: El documento debe pertenecer al usuario y existir en disco.
+@LI Postcondiciones: El navegador descarga el archivo.
+@LI Flujo principal: 1. El usuario selecciona "Descargar". 2. El sistema valida propiedad y existencia. 3. El sistema envía el archivo.
+@LI Requisitos: RF-007. Historias: HU-004.
+@B CU-009 - Eliminar documento
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Eliminar un documento propio.
+@LI Precondiciones: El documento debe pertenecer al usuario.
+@LI Postcondiciones: Se eliminan registro, archivo físico e índice (RB-010).
+@LI Flujo principal: 1. El usuario selecciona "Eliminar". 2. Confirma. 3. El sistema elimina y confirma.
+@LI Requisitos: RF-008. Historias: HU-005.
+@B CU-010 - Procesar documento con IA
+@LI Actor: Sistema.
+@LI Objetivo: Extraer, clasificar, resumir, extraer información e indexar un documento.
+@LI Precondiciones: Documento en estado "processing" con texto extraído.
+@LI Postcondiciones: El documento queda en estado "indexed" con categoría, resumen, información extraída e índice vectorial.
+@LI Flujo principal: 1. Se extrae el texto. 2. Se clasifica la categoría. 3. Se genera el resumen. 4. Se extrae la información relevante. 5. Se generan los chunks y embeddings. 6. Se almacena el índice. 7. El estado pasa a "indexed".
+@LI Flujos alternativos: 1a. Sin texto extraído: estado "failed" (RB-006).
+@LI Requisitos: RF-009, RF-010, RF-011, RF-012, RF-013. Historias: HU-003.
+@LI Reglas de negocio: RB-005, RB-006, RB-007, RB-009.
+@B CU-011 - Buscar en el contenido
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Encontrar fragmentos donde aparece un término dentro del contenido.
+@LI Precondiciones: Documentos indexados en el repositorio del usuario.
+@LI Postcondiciones: Se muestran los fragmentos coincidentes ordenados por relevancia.
+@LI Flujo principal: 1. El usuario ingresa el término. 2. El sistema busca en el contenido de sus documentos. 3. El sistema presenta los resultados.
+@LI Flujos alternativos: 2a. Sin coincidencias: mensaje informativo.
+@LI Requisitos: RF-014. Historias: HU-006.
+@B CU-012 - Preguntar en lenguaje natural (chat RAG)
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Obtener una respuesta fundamentada en los documentos del repositorio.
+@LI Precondiciones: Sesión iniciada y documentos indexados.
+@LI Postcondiciones: Se muestra la respuesta y las fuentes consultadas.
+@LI Flujo principal: 1. El usuario escribe la pregunta. 2. El sistema vectoriza la consulta. 3. Recupera los chunks más relevantes. 4. Genera la respuesta con o sin LLM. 5. Presenta la respuesta con fuentes.
+@LI Flujos alternativos: 4a. Sin evidencia: el sistema responde que no encontró información (RB-008).
+@LI Requisitos: RF-015. Historias: HU-007.
+@B CU-013 - Visualizar dashboard
+@LI Actor: Cliente o Administrador.
+@LI Objetivo: Consultar indicadores del repositorio.
+@LI Precondiciones: Sesión iniciada.
+@LI Postcondiciones: Se muestran los indicadores calculados sobre los datos del usuario.
+@LI Flujo principal: 1. El usuario abre el dashboard. 2. El sistema consulta los indicadores. 3. El sistema los presenta.
+@LI Requisitos: RF-016. Historias: HU-008.
+@B CU-014 - Monitorear procesamiento y errores
+@LI Actor: Administrador.
+@LI Objetivo: Supervisar estados y registrar errores del procesamiento.
+@LI Precondiciones: Sesión de administrador.
+@LI Postcondiciones: El administrador visualiza los estados y errores registrados.
+@LI Flujo principal: 1. El administrador abre el panel de monitoreo. 2. El sistema presenta estados y registros de error.
+@LI Requisitos: RF-017, RF-018. Historias: HU-009.
+@B CU-015 - Configurar el sistema
+@LI Actor: Administrador.
+@LI Objetivo: Configurar parámetros de IA del sistema.
+@LI Precondiciones: Sesión de administrador.
+@LI Postcondiciones: Los parámetros se guardan y aplican a nuevos procesos.
+@LI Flujo principal: 1. El administrador abre configuración. 2. Edita los parámetros. 3. Guarda. 4. El sistema confirma.
+@LI Requisitos: RF-020. Historias: HU-010.
+@PB

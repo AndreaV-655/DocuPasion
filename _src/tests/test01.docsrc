@@ -1,0 +1,21 @@
+@TITLE DocuPasion
+@SUB Sistema de prueba del generador
+@AUTHOR Equipo DocuPasion
+@DATE Septiembre 2026
+@PB
+@H1 1. Prueba de Encabezado
+@P Este es un párrafo de prueba con acentos: á é í ó ú ñ, y signos: ?i!()/%.
+@H2 1.1 Tabla de prueba
+@TABLE
+@HDR ID | Nombre | Descripción
+@ROW RF-001 | Autenticación | Registro y login de usuarios con JWT
+@ROW RF-002 | Documentos | Carga y consulta de archivos PDF, DOCX y TXT
+@ENDT
+@LI Elemento de lista uno
+@LI Elemento de lista dos
+@PRE
+Documento -> Validación -> Extracción -> Clasificación -> Resumen
+@ENDPRE
+@PB
+@H3 1.2 Conclusión
+@B Texto importante en negrita.

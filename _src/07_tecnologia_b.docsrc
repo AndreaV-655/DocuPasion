@@ -1,0 +1,106 @@
+@PB
+
+@H1 5. Integración continua y automatización
+@H2 5.1 Estado actual
+@P Dado que el entorno de desarrollo no dispone de Python instalado, la integración continua no puede ejecutarse de forma automática en este momento. Sin embargo, la estructura del proyecto está preparada para incorporarla:
+@LI El archivo backend/requirements.txt lista todas las dependencias con versiones fijas, lo que permite reproducir el entorno exacto con pip install -r requirements.txt.
+@LI Las pruebas se organizarían en backend/tests/ (pytest) y frontend/tests/ (jest o node --check).
+@LI El pipeline de CI (GitHub Actions o similar) ejecutaría: install, lint, test, build, deploy.
+@H2 5.2 Pruebas de documentos (FASE actual)
+@P La única automatización funcional en este momento es la generación de documentos. El script generate_doc.ps1 se ejecuta en cada fase para producir el .doc desde las fuentes .docsrc, y la verificación post-generación (conteo de secciones, filas, ausencia de tags residuales) se ejecuta con comandos PowerShell inline. Esto garantiza que los documentos entregados tengan estructura consistente.
+@H2 5.3 Plan futuro de automatización
+@LI Linting: flake8 o ruff para Python, eslint para JavaScript.
+@LI Pruebas unitarias: pytest con fixtures de base de datos en memoria.
+@LI Pruebas de integración: httpx para endpoints de la API.
+@LI CI pipeline: GitHub Actions con trigger push/PR, matrix Python 3.10-3.12.
+@LI Despliegue: uvicorn en servidor local; Docker opcional para entorno reproducible.
+@PB
+
+@H1 6. Administración del proyecto
+@H2 6.1 Estructura por fases
+@P El proyecto se organiza en 13 fases documentadas, cada una con un entregable principal en formato .doc y soporte en carpetas específicas. El avance se mide por la completitud de los entregables y la consistencia entre fases (trazabilidad).
+@TABLE
+@HDR Fase | Entregable | Estado
+@ROW 01 Análisis | 01_Analisis_Requisitos.doc (8.1-8.17) | Completada
+@ROW 02 Diseño | 02_Diseno_Arquitectura.doc (9.1-9.19) | Completada
+@ROW 03 Bases | Investigación académica | Pendiente
+@ROW 04 Base de datos | Ficha de revisión de BD | Pendiente
+@ROW 05 Prototipo | Código + servicios IA (FASE 5) | Completada
+@ROW 06 Código fuente | 06_Codigo_Fuente.doc | Completada
+@ROW 07 Tecnología | 07_Tecnologia.doc | Completada
+@ROW 08 Pruebas | Plan y evidencia de pruebas | Pendiente
+@ROW 09 Documentación | Documentación de usuario y técnica | Pendiente
+@ROW 10 Funcionamiento | Demo funcional y capturas | Pendiente
+@ROW 11 Calidad | Plan de aseguramiento de calidad | Pendiente
+@ROW 12 Publicación | Publicación y resultados | Pendiente
+@ROW 13 Presentación | Presentación final | Pendiente
+@ENDT
+@H2 6.2 Hitos y seguimiento
+@P Los hitos se definen por la finalización de cada fase documentada. El seguimiento se realiza comparando el estado actual de las carpetas de entrega con la lista de entregables requeridos. La consistencia entre fases se verifica en la FASE 9 (Matriz de trazabilidad final), donde se cruza cada requisito con su diseño, código, prueba y evidencia.
+@H2 6.3 Gestión de cambios
+@P Los cambios al alcance (nuevos requisitos, exclusiones, decisiones técnicas) se documentan en la sección de Decisiones de cada fase. Los cambios al código se controlan con Git (commits descriptivos y ramas feature/). Los cambios a la documentación se realizan en las fuentes .docsrc y se regeneran con el generador antes de la entrega.
+@PB
+
+@H1 7. Recursos del proyecto
+@H2 7.1 Recursos de hardware
+@TABLE
+@HDR Recurso | Especificación | Uso
+@ROW Estación de desarrollo | Windows 10/11, 16 GB RAM, procesador moderno | Desarrollo, pruebas y documentación.
+@ROW Navegador web | Chrome o Edge (última versión) | Pruebas del frontend y del visor PDF.
+@ROW Conexión a Internet | Estable, mínima para dependencias y CDN | Descarga de lucide, pdf.js, Inter fonts y dependencias npm.
+@ENDT
+@H2 7.2 Recursos de software
+@TABLE
+@HDR Recurso | Versión | Propósito
+@ROW Python | 3.10 o superior | Backend (FastAPI, SQLAlchemy, PyPDF2, python-docx, openai, jose, bcrypt).
+@ROW Node.js | 18+ (verificada: v24.19.0) | Validación de sintaxis JavaScript (node --check).
+@ROW Git | Última versión | Control de versiones.
+@ROW Visual Studio Code | Última versión | Editor de código.
+@ROW PowerShell | 5.1+ (Windows) | Generación de documentos (.doc) y scripts.
+@ROW FastAPI | 0.115.6 | Framework backend.
+@ROW SQLAlchemy | 2.0.36 | ORM y acceso a datos.
+@ROW OpenAI API | Opcional | Generación con LLM (gpt-4o-mini).
+@ROW pdf.js | 3.11.174 (CDN) | Visor de PDF en el navegador.
+@ROW Lucide | Última (CDN) | Iconos de la interfaz.
+@ROW Inter Font | Google Fonts (CDN) | Tipografía de la interfaz.
+@ENDT
+@H2 7.3 Recursos humanos
+@P El proyecto se desarrolla de forma individual por un estudiante de ingeniería, lo que implica que las funciones de analista, diseñador, programador, probador y documentador recaen en la misma persona. Esto demanda una organización estricta del tiempo y un seguimiento riguroso de las fases para evitar retrasos o inconsistencias.
+@PB
+
+@H1 8. Evaluación de riesgos del proyecto
+@H2 8.1 Matriz de riesgos
+@TABLE
+@HDR ID | Riesgo | Impacto | Probabilidad | Mitigación
+@ROW R1 Falta de Python | Alto | Alta (entorno actual) | Instalar Python; por ahora, usar node --check para JS y generar .doc con PowerShell.
+@ROW R2 Ausencia de OpenAI API key | Medio | Media | Funcionar con respuestas simuladas (fallback); documentar la necesidad de configurar la clave en .env.
+@ROW R3 Cambios en requisitos | Medio | Baja | Documentar cada decisión en la fase correspondiente; actualizar trazabilidad en FASE 9.
+@ROW R4 Inconsistencia entre fases | Alto | Baja | Revisión de consistencia antes de generar cada .doc; regeneración completa después de cambios.
+@ROW R5 Pérdida de archivos sensibles | Alto | Baja | .gitignore excluye .env; nunca commitear credenciales; respaldos en OneDrive.
+@ROW R6 Rendimiento del motor RAG | Medio | Media | Indexación incremental (ya implementada con owner_id); chunking configurable via SystemConfig.
+@ROW R7 Incompatibilidad de navegador | Bajo | Baja | Usar API nativa (fetch, FileReader, DragEvent); evitar polyfills innecesarios; probar en Chrome y Edge.
+@ROW R8 Alcance excesivo | Alto | Media | Dividir en fases; priorizar componentes críticos (CRUD + IA); posponer extras (WebSocket, notificaciones).
+@ENDT
+@H2 8.2 Lecciones aprendidas
+@LI La generación automatizada de documentos con PowerShell ahorra tiempo y garantiza consistencia, pero requiere validación post-generación.
+@LI La ausencia de Python es un bloqueo significativo para la verificación del código backend y la ejecución de pruebas. Se recomienda instalar Python en el entorno de desarrollo lo antes posible.
+@LI El aislamiento de usuarios en el motor RAG es un cambio de bajo costo (un campo por chunk) con alto impacto en seguridad.
+@LI La integración del frontend SPA con la API backend reveló que los componentes mock previos ocultaban inconsistencias en los tipos de respuesta del backend.
+@LI El registro público con campo role seleccionable es un riesgo de seguridad crítico; debe corregirse antes de cualquier despliegue real.
+@PB
+
+@H1 Conclusiones
+@P Este documento formaliza las prácticas de ingeniería aplicadas al proyecto DocuPasion: gestión del código con Git, generación de documentos con una herramienta personalizada, técnicas de programación modernas (inyección de dependencias, validación con Pydantic, JWT, RAG con aislamiento por usuario) y una estructura de proyecto preparada para integración continua. La evaluación de riesgos identifica los bloqueos actuales (falta de Python y API key) y propone mitigaciones concretas. El proyecto cuenta con una base técnica sólida para avanzar hacia las fases de pruebas, documentación de usuario y despliegue.
+@PB
+
+@H1 Referencias
+@LI FastAPI Documentation - fastapi.tiangolo.com
+@LI SQLAlchemy 2.0 Documentation - docs.sqlalchemy.org
+@LI Pydantic V2 Documentation - docs.pydantic.dev
+@LI PYTHON-JOSE Documentation - python-jose.readthedocs.io
+@LI Passlib + bcrypt - passlib.readthedocs.io
+@LI OpenAI API Reference - platform.openai.com/docs/api-reference
+@LI pdf.js Documentation - mozilla.github.io/pdf.js
+@LI Lucide Icons - lucide.dev
+@LI Inter Font - fonts.google.com/specimen/Inter
+@LI GitHub Actions Documentation - docs.github.com/en/actions

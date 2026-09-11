@@ -1,0 +1,355 @@
+@TITLE DocuPasion
+@SUB Documentación del Sistema (Técnica y de Usuario)
+@SUB FASE 9 - DOCUMENTACIÓN
+@AUTHOR Equipo de Ingeniería
+@DATE 11 de septiembre de 2026
+@PB
+@H1 Tabla de contenido
+@LI 1. Introducción
+@LI 2. Introducción general del sistema
+@LI 3. Manual de instalación y configuración
+@LI 4. Manual de usuario
+@LI 5. Manual del administrador
+@LI 6. Documentación de la API
+@LI 7. Integración frontend-backend
+@LI 8. Circuito de funcionamiento completo
+@LI 9. Centro de ayuda del sistema
+@LI 10.Plan de migración de datos
+@LI Conclusiones
+@LI Referencias
+@PB
+
+@H1 1. Introducción
+@H2 1.1 Propósito
+@P Este documento reúne la documentación técnica y de usuario del sistema DocuPasion: manual de instalación, manual de usuario, manual del administrador, referencia de la API REST, descripción de la integración frontend-backend, el circuito de funcionamiento completo y el plan de migración de datos. Está dirigido a los tres perfiles que interactúan con el sistema: usuarios finales, administradores y operadores técnicos.
+@H2 1.2 Lectores objetivo y convenciones de escritura
+@TABLE
+@HDR Perfil | Secciones de interés | Formato
+@ROW Usuario final | 3, 4, 8 | Manual orientado a tareas concretas
+@ROW Administrador | 5, 8, 9 | Instrucciones de panel y configuración
+@ROW Técnico / desarrollador | 3, 6, 7, 10 | Documentación de instalación, API e integración
+@ENDT
+@H2 1.3 Glosario
+@TABLE
+@HDR Término | Definición
+@ROW Repository (repositorio) | Contenedor lógico organizado por el usuario para agrupar documentos.
+@ROW Category (categoría) | Etiqueta de clasificación: académico, técnico, legal, administrativo o general.
+@ROW RAG | Retrieval-Augmented Generation: técnica de IA que recupera fragmentos relevantes de los documentos para responder.
+@ROW Chunk | Fragmento de texto indexado por el motor de IA para búsquedas.
+@ROW Estado del documento | processing (procesando), indexed (indexado), failed (error).
+@ROW AILog | Registro de las operaciones de IA ejecutadas por cada usuario.
+@ROW ErrorLog | Registro de errores ocurridos durante el procesamiento.
+@ROW JWT | Token JSON Web Token usado para autenticar sesiones.
+@ENDT
+@PB
+
+@H1 2. Introducción general del sistema
+@H2 2.1 Qué es DocuPasion
+@P DocuPasion es un sistema de gestión documental con inteligencia artificial que permite a los usuarios almacenar, organizar, buscar y consultar sus documentos, y realizar preguntas en lenguaje natural sobre su contenido. El sistema integra la carga de archivos (PDF, DOCX, TXT), la clasificación automática por categorías, la extracción de información relevante, la búsqueda semántica y un asistente conversacional basado en RAG.
+@H2 2.2 Módulos funcionales
+@TABLE
+@HDR Módulo | Función | Rol
+@ROW Autenticación | Registro e inicio de sesión con JWT | Usuario y admin
+@ROW Dashboard | Estadísticas del usuario: total, procesados, fallidos, por categoría, preguntas y ahorro de tiempo | Usuario y admin
+@ROW Repositorios | Crear, renombrar y eliminar contenedores | Usuario y admin
+@ROW Documentos | Cargar, listar, filtrar, ver, descargar y eliminar | Usuario y admin
+@ROW Chat IA | Preguntas en lenguaje natural con fuentes | Usuario y admin
+@ROW Monitoreo | Logs de errores y de IA | Solo admin
+@ROW Configuración | Parámetros del sistema (chunk, modelo LLM) | Solo admin
+@ENDT
+@H2 2.3 Roles del sistema
+@P El sistema define dos roles: client (cliente) y admin (administrador). El rol client puede gestionar sus repositorios, documentos y usar el chat IA. El rol admin agrega las vistas de monitoreo y configuración. El registro público siempre crea usuarios con rol client; el rol admin se asigna en la base de datos (RB-004).
+@H2 2.4 Tipos de archivo soportados
+@TABLE
+@HDR Formato | Extracción de texto | Clasificación | Indexación de IA | Visor
+@ROW PDF | Sí (PyPDF2) | Sí | Sí | pdf.js
+@ROW DOCX | Sí (python-docx) | Sí | Sí | Vista previa en consola
+@ROW TXT | Sí (lectura nativa) | Sí | Sí | Vista previa en consola
+@ROW Otros | No | No | No | Detalle básico
+@ENDT
+@PB
+
+@H1 3. Manual de instalación y configuración
+@H2 3.1 Requisitos del sistema
+@TABLE
+@HDR Requisito | Valor mínimo
+@ROW Sistema operativo | Windows 10/11, macOS o Linux
+@ROW Python | 3.10 o superior
+@ROW Navegador | Chrome, Edge o Firefox (últimas versiones)
+@ROW RAM | 4 GB recomendado
+@ROW Espacio en disco | 500 MB (más el espacio para documentos)
+@ROW Red | Conexión a Internet para dependencias y (opcional) API de OpenAI
+@ENDT
+@H2 3.2 Instalación del backend
+@LI Paso 1: instalar Python 3.10+ desde python.org y verificar con el comando python --version.
+@LI Paso 2: abrir una terminal en la carpeta backend/ del proyecto.
+@LI Paso 3: crear el entorno virtual: python -m venv venv.
+@LI Paso 4: activar el entorno: venv\Scripts\activate (Windows) o source venv/bin/activate (Linux/macOS).
+@LI Paso 5: instalar dependencias: pip install -r requirements.txt.
+@LI Paso 6: copiar .env.example a .env y configurar los valores (ver sección 3.3).
+@H2 3.3 Archivo de configuración (.env)
+@P El archivo .env contiene los valores de configuración del sistema. Nunca debe subirse a un repositorio ni compartirse.
+@TABLE
+@HDR Variable | Descripción | Valor por defecto
+@ROW SECRET_KEY | Clave para firmar tokens JWT | Cambiar por una secreta
+@ROW ALGORITHM | Algoritmo de firma JWT | HS256
+@ROW ACCESS_TOKEN_EXPIRE_MINUTES | Duración del token en minutos | 1440 (24 horas)
+@ROW DATABASE_URL | Ruta de la base de datos SQLite | sqlite:///./docupasion.db
+@ROW UPLOAD_DIR | Carpeta de almacenamiento de archivos | ./uploads
+@ROW FRONTEND_DIR | Ruta del frontend estático | ../frontend
+@ROW CORS_ORIGINS | Orígenes permitidos (separados por coma) | http://localhost:8000,http://localhost:5173
+@ROW OPENAI_API_KEY | Clave de la API de OpenAI (opcional) | Vacío = modo simulado
+@ROW EMBEDDING_MODEL | Modelo de embeddings | text-embedding-3-small
+@ROW LLM_MODEL | Modelo de generación | gpt-4o-mini
+@ROW CHUNK_SIZE | Tamaño de fragmento para indexar | 512
+@ROW CHUNK_OVERLAP | Solapamiento entre fragmentos | 64
+@ENDT
+@LI Nota: si OPENAI_API_KEY está vacía, el sistema funciona en modo simulado: la IA devuelve respuestas orientativas sin conectarse a OpenAI. Esto permite probar el sistema sin claves.
+@H2 3.4 Inicio del servidor
+@LI Paso 1: con el entorno activo, ejecutar: uvicorn app.main:app --host 0.0.0.0 --port 8000.
+@LI Paso 2: abrir en el navegador: http://localhost:8000 (aplicación) y http://localhost:8000/docs (documentación interactiva de la API).
+@LI Paso 3: el frontend se sirve automáticamente desde la carpeta FRONTEND_DIR; no requiere instalación adicional.
+@H2 3.5 Resolución de problemas comunes
+@TABLE
+@HDR Problema | Causa probable | Solución
+@ROW ImportError: No module named fastapi | Dependencias no instaladas | Ejecutar pip install -r requirements.txt
+@ROW El frontend no carga | FRONTEND_DIR incorrecto | Verificar la ruta en .env
+@ROW Error de autenticación al subir | Token expirado | Volver a iniciar sesión
+@ROW Respuestas simuladas del chat | OPENAI_API_KEY vacía | Configurar la clave para activar el LLM real
+@ROW Tabla no existe | Base de datos nueva | Reiniciar el servidor; main.py crea las tablas automáticamente
+@ENDT
+@PB
+
+@H1 4. Manual de usuario
+@H2 4.1 Registro e inicio de sesión
+@P En la pantalla inicial se ofrecen dos formularios: Registrarse y Entrar. Para crear una cuenta se ingresa un correo y una contraseña de al menos 6 caracteres. Tras registrarse, el usuario inicia sesión con las mismas credenciales. La sesión permanece activa durante 24 horas; al cerrarla con el botón Salir se limpia el token local.
+@H2 4.2 Panel principal (Dashboard)
+@P El dashboard muestra las estadísticas del usuario: número total de documentos, documentos procesados, documentos con error, distribución por categoría y por estado, cantidad de preguntas realizadas al asistente y tiempo estimado ahorrado. La información se actualiza al recargar la vista.
+@H2 4.3 Gestión de repositorios
+@H2 4.3.1 Crear un repositorio
+@P En la vista Repositorios se pulsa el botón Nuevo repositorio, se escribe un nombre único para el usuario y se confirma. El repositorio aparece en la lista con el conteo de documentos asociados.
+@H2 4.3.2 Renombrar y eliminar
+@P Pulsando los iconos de acción de cada fila se puede renombrar (cambiar el nombre) o eliminar (confirmando la acción). Un repositorio con documentos no se puede eliminar: el sistema muestra el mensaje de error 409.
+@H2 4.4 Gestión de documentos
+@H2 4.4.1 Subir un documento
+@P En la vista Documentos se puede cargar un archivo PDF, DOCX o TXT de dos formas: arrastrando y soltando el archivo sobre el área de carga, o pulsando el botón Seleccionar archivo. Antes de subir se puede elegir un repositorio de destino. Durante el procesamiento el documento aparece con estado Procesando; cuando termina, cambia a Indexado.
+@H2 4.4.2 Filtrar y buscar
+@P La lista de documentos se puede filtrar por repositorio, categoría, estado y por el nombre del archivo mediante el campo de búsqueda. Los filtros se combinan entre sí.
+@H2 4.4.3 Ver un documento
+@P Al pulsar una fila se abre el detalle del documento con: metadatos (nombre, tipo, tamaño, fecha), categoría asignada por el clasificador, resumen automático, campos de información extraídos (según el tipo de documento: académico, técnico, legal o administrativo), el visor integrado para PDF (pdf.js) y las pestañas de contenido y estructura.
+@H2 4.4.4 Descargar y eliminar
+@P El botón Descargar descarga el archivo original con su nombre real. El botón Eliminar borra el documento, su archivo en disco, sus registros y su índice de IA de forma definitiva; se solicita confirmación antes de eliminar.
+@H2 4.5 Asistente de IA (Chat)
+@P En la vista Chat se escriben preguntas en lenguaje natural sobre el contenido de los documentos del usuario. El asistente responde con base en los fragmentos recuperados de sus propios documentos y muestra las fuentes consultadas. Si no hay documentos o la pregunta no se responde con el contenido disponible, el asistente devuelve un mensaje orientativo. Cada pregunta ejercida se guarda en los registros de IA.
+@H2 4.6 Preguntas frecuentes del usuario
+@TABLE
+@HDR Pregunta | Respuesta
+@ROW ¿Puedo eliminar un repositorio con documentos? | No; primero debe quedar vacío.
+@ROW ¿Qué pasa si mi archivo es .exe? | Se rechaza: solo se aceptan PDF, DOCX y TXT.
+@ROW ¿Cuánto tarda en indexarse un documento? | De forma inmediata al finalizar la carga.
+@ROW ¿Los documentos se comparten con otros usuarios? | No; cada usuario solo ve los suyos.
+@ROW ¿Necesito conexión para el chat? | Solo si se usa el LLM real; en modo simulado responde localmente.
+@ENDT
+@PB
+
+@H1 5. Manual del administrador
+@H2 5.1 Acceso al panel de administración
+@P El administrador inicia sesión como cualquier usuario. Al autenticarse con rol admin, la barra lateral muestra dos secciones adicionales: Monitoreo y Configuración. Si la cuenta aún no tiene rol admin, debe asignarse manualmente en la base de datos (actualizar el campo role a admin en la tabla users).
+@H2 5.2 Monitoreo
+@H2 5.2.1 Logs de errores
+@P La vista Monitoreo lista los errores de procesamiento con: fecha, documento asociado, código de error, mensaje y nivel de severidad. Permite visualizar los fallos de extracción o indexación del sistema.
+@H2 5.2.2 Registros de IA
+@P Los registros de IA muestran cada operación del motor: pregunta del usuario, tipo de operación, documentos consultados, tokens usados y tiempo de respuesta. Esta información permite auditar el uso de la IA y el consumo del plan.
+@H2 5.3 Configuración del sistema
+@P La vista Configuración permite al administrador consultar y modificar los parámetros del sistema que se persisten en la base de datos (tabla system_config):
+@TABLE
+@HDR Parámetro | Descripción | Rango sugerido
+@ROW chunk_size | Tamaño de fragmento para indexar nuevos documentos | 256-1024
+@ROW chunk_overlap | Solapamiento entre fragmentos | 0-128
+@ROW llm_model | Modelo de generación de respuestas | gpt-4o-mini u otro
+@ENDT
+@P Los cambios se aplican a los documentos indexados a partir de ese momento. Para que los cambios afecten a documentos ya indexados, debe volver a cargarlos (actualización manual).
+@H2 5.4 Buenas prácticas del administrador
+@LI Mantener la SECRET_KEY en .env de forma segura y nunca cambiarla sin volver a emitir tokens.
+@LI Configurar la OPENAI_API_KEY para el uso completo de la IA; revisar el consumo en los registros de IA.
+@LI Supervisar periódicamente los logs de errores e implementar mejoras en el pipeline si los fallos se repiten.
+@LI Respaldar la base de datos (docupasion.db) y la carpeta uploads/ de forma regular.
+@PB
+
+@H1 6. Documentación de la API
+@H2 6.1 Especificación general
+@P La API REST se sirve desde /api. El formato de intercambio es JSON (requerimientos y respuestas). Las peticiones autenticadas incluyen la cabecera Authorization: Bearer [token]. Los códigos de error estándar son: 400 (solicitud inválida), 401 (no autenticado), 403 (permiso denegado), 404 (no encontrado), 409 (conflicto) y 422 (validación de datos).
+@H2 6.2 Autenticación (/api/auth)
+@B POST /api/auth/register
+@P Crea una cuenta con rol client. Cuerpo: {email, password}. Respuesta 201: {id, email, role, access_token, token_type}.
+@B POST /api/auth/login
+@P Inicia sesión. Cuerpo (form): username (email) y password. Respuesta 200: {access_token, token_type}.
+@B GET /api/auth/me
+@P Perfil del usuario autenticado. Respuesta 200: {id, email, role}.
+@H2 6.3 Repositorios (/api/repositories)
+@B GET /api/repositories/
+@P Lista los repositorios del usuario con conteo de documentos.
+@B POST /api/repositories/
+@P Crea un repositorio. Cuerpo: {name}. Respuesta 201. Error 409 si el nombre existe para el mismo usuario.
+@B PATCH /api/repositories/{repo_id}
+@P Renombra un repositorio propio. Cuerpo: {name}.
+@B DELETE /api/repositories/{repo_id}
+@P Elimina un repositorio vacío. Error 409 si contiene documentos.
+@H2 6.4 Documentos (/api/documents)
+@B POST /api/documents/upload
+@P Carga un archivo (multipart: file, repository_id opcional). Respuesta 201: documento con estado processing. Ejecuta el pipeline de IA (texto, clasificación, resumen, extracción, embeddings e indexación).
+@B GET /api/documents/
+@P Lista documentos del usuario con filtros: repo, category, status, q (nombre).
+@B GET /api/documents/{doc_id}
+@P Detalle completo: metadatos, resumen, extracciones y ruta de vista previa.
+@B GET /api/documents/{doc_id}/download
+@P Descarga el archivo original autorizada (Blob en el frontend).
+@B DELETE /api/documents/{doc_id}
+@P Elimina documento, archivo, registros e índice.
+@B GET /api/documents/stats/summary
+@P Estadísticas del dashboard: total, procesados, fallidos, por categoría y estado, preguntas, ahorro de tiempo.
+@H2 6.5 Chat y búsqueda (/api/chat)
+@B POST /api/chat/
+@P Consulta RAG en lenguaje natural. Cuerpo: {message}. Respuesta: respuesta y fuentes. Filtra por el usuario autenticado.
+@B GET /api/chat/search?q=...
+@P Búsqueda por palabras clave sobre nombre, contenido y metadatos del usuario.
+@H2 6.6 Monitoreo (/api/monitoring) - solo admin
+@B GET /api/monitoring/errors
+@P Logs de errores paginados (limit, offset).
+@B GET /api/monitoring/ai-logs
+@P Registros de operaciones de IA paginados.
+@H2 6.7 Configuración (/api/config) - solo admin
+@B GET /api/config/
+@P Parámetros actuales del sistema sin secretos.
+@B PUT /api/config/
+@P Actualiza los parámetros y los persiste. Cuerpo: {chunk_size?, chunk_overlap?, llm_model?}.
+@H2 6.8 Ejemplos de peticiones (curl)
+@B Registro
+@PRE
+curl -X POST http://localhost:8000/api/auth/register -H "Content-Type: application/json" -d "{\"email\": \"usuario@mail.com\", \"password\": \"miClave123\"}"
+@ENDPRE
+@B Login
+@PRE
+curl -X POST http://localhost:8000/api/auth/login -d "username=usuario@mail.com&password=miClave123"
+@ENDPRE
+@B Subir documento (con token)
+@PRE
+curl -X POST http://localhost:8000/api/documents/upload -H "Authorization: Bearer TOKEN" -F "file=@documento.pdf" -F "repository_id=1"
+@ENDPRE
+@B Pregunta IA
+@PRE
+curl -X POST http://localhost:8000/api/chat/ -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" -d "{\"message\": \"Cuál es el objetivo del documento\"}"
+@ENDPRE
+@PB
+
+@H1 7. Integración frontend-backend
+@H2 7.1 Arquitectura de comunicación
+@P El frontend es una SPA servida por el propio backend (StaticFiles desde FRONTEND_DIR). La comunicación se realiza mediante fetch contra los endpoints /api. La sesión se almacena en el navegador mediante el token JWT guardado en localStorage.
+@TABLE
+@HDR Capa | Tecnología | Responsabilidad
+@ROW Frontend | HTML5, CSS3, JavaScript nativo | Interfaz de usuario, routing de vistas, estados de carga
+@ROW Capa de API | js/api.js (fetch) | Llamadas HTTP, adjuntar token, manejo de errores
+@ROW Backend | FastAPI (Python) | Rutas REST, validación, lógica de negocio
+@ROW Persistencia | SQLAlchemy + SQLite | Modelos, sesiones, consultas
+@ROW IA | services (embedding, rag_engine, extractor) | Pipeline documental y respuestas RAG
+@ENDT
+@H2 7.2 Flujo de autenticación
+@LI El usuario envía credenciales a POST /api/auth/login.
+@LI El backend valida y devuelve el token JWT.
+@LI js/api.js guarda el token en localStorage y lo adjunta en cada petición (Authorization: Bearer).
+@LI Si una respuesta es 401, la capa api.js cierra sesión automáticamente.
+@LI Al salir, js/app.js limpia el token y regresa a la vista de login.
+@H2 7.3 Flujo de carga de documentos
+@LI El usuario arrastra un archivo (drag-and-drop) o lo selecciona.
+@LI js/app.js construye FormData con el archivo y el repository_id.
+@LI El formulario se envía mediante API.upload a POST /api/documents/upload con el token.
+@LI El backend guarda el archivo con nombre seguro, inicia el pipeline y devuelve el documento.
+@LI El frontend actualiza la lista y las estadísticas del dashboard.
+@H2 7.4 Flujo del chat IA
+@LI El usuario escribe la pregunta y la envía vía API.post a /api/chat/.
+@LI El motor recupera los fragmentos más relevantes de los documentos del usuario.
+@LI Si hay API key, el LLM genera la respuesta; si no, el modo simulado devuelve una respuesta orientativa.
+@LI El frontend muestra la respuesta con las fuentes asociadas.
+@PB
+
+@H1 8. Circuito de funcionamiento completo
+@H2 8.1 Diagrama del circuito de un documento
+@P El ciclo de vida completo de un documento dentro del sistema es el siguiente:
+@LI 1. Carga: el usuario sube PDF, DOCX o TXT con repositorio opcional. Se valida tipo y tamaño; se genera un nombre interno con UUID.
+@LI 2. Extracción: el servicio pdf_parser.py extrae el texto; si falla, el documento pasa a estado failed y se registra en ErrorLog.
+@LI 3. Clasificación: el clasificador asigna una de las 4+1 categorías con umbral de coincidencias.
+@LI 4. Resumen: se seleccionan las primeras oraciones significativas del texto.
+@LI 5. Extracción de campos: según el tipo de documento, se detectan campos (autor, año, partes, cláusulas, etc.).
+@LI 6. Embeddings: el texto se divide en chunks con solapamiento y se generan vectores.
+@LI 7. Indexación: los chunks, vectores y owner_id se almacenan en el índice en memoria del motor RAG.
+@LI 8. Almacenamiento: el documento queda con estado indexed y registrado en AILog.
+@LI 9. Consulta: el usuario puede ver, filtrar, descargar y preguntar sobre el documento.
+@LI 10. Eliminación: al eliminar, se borran archivo, registros, extracciones e índice.
+@H2 8.2 Operaciones del circuito por usuario
+@TABLE
+@HDR Etapa | Acción | Resultado visible | Registro
+@ROW 1 Carga | Upload | Documento con estado Procesando | AILog
+@ROW 2-7 Procesamiento | Pipeline automático | Estado Indexado (o Failed) | ErrorLog si falla
+@ROW 8 Almacenamiento | Persistencia | Documento en la lista | AILog
+@ROW 9 Consulta | Ver, filtrar, descargar, preguntar | Detalle, visor PDF, fuentes del chat | AILog en preguntas
+@ROW 10 Eliminación | Borrado | Documento fuera de la lista | Eliminación física
+@ENDT
+@H2 8.3 Circuito del administrador
+@LI El administrador supervisa errores y operaciones de IA en Monitoreo.
+@LI El administrador ajusta los parámetros (chunk_size, chunk_overlap, llm_model) en Configuración.
+@LI Los nuevos valores afectan los documentos cargados posteriormente.
+@LI El administrador puede auditar el consumo de IA mediante los registros de tokens.
+@PB
+
+@H1 9. Centro de ayuda del sistema
+@H2 9.1 Funcionalidad de ayuda dentro de la aplicación
+@P El sistema integra ayudas contextuales en los formularios: textos placeholder explicativos, mensajes de error descriptivos (por ejemplo, contraseña mínima), confirmaciones antes de acciones destructivas y notificaciones (toasts) de éxito o error tras cada operación. La interfaz está completa en español.
+@H2 9.2 Proceso de ayuda para el usuario
+@TABLE
+@HDR Necesidad del usuario | Mecanismo de ayuda | Ubicación
+@ROW No sé cómo subir un archivo | Área de carga con instrucción Arrastra o selecciona | Documentos
+@ROW No sé qué responder la IA | Mensajes orientativos del asistente | Chat
+@ROW Error al eliminar repositorio | Mensaje de conflicto 409 explicado | Repositorios
+@ROW Contraseña demasiado corta | Mensaje de validación | Registro
+@ROW Token expirado | Redirección automática a login | Toda la aplicación
+@ENDT
+@H2 9.3 Documentación de soporte externo
+@P Este documento cumple la función de centro de ayuda externo: el Manual de usuario (sección 4) cubre los flujos del usuario final; el Manual del administrador (sección 5) cubre las tareas de configuración y monitoreo; y la sección 3 documenta la instalación y resolución de problemas para el soporte técnico.
+@PB
+
+@H1 10. Plan de migración de datos
+@H2 10.1 Origen y destino
+@P Los datos del sistema residen en una base de datos SQLite (docupasion.db) y en la carpeta uploads/. El plan de migración considera dos escenarios: (1) trasladar el sistema a otro equipo y (2) migrar la base de datos de SQLite a PostgreSQL (RNF-009).
+@H2 10.2 Migración a otro equipo
+@LI Paso 1: detener el servidor.
+@LI Paso 2: copiar la carpeta del proyecto (backend/, frontend/ y las carpetas de entrega documental).
+@LI Paso 3: copiar el archivo docupasion.db.
+@LI Paso 4: copiar la carpeta uploads/ con los archivos originales.
+@LI Paso 5: en el nuevo equipo, ejecutar la instalación de la sección 3 y reemplazar los archivos copiados.
+@LI Paso 6: verificar el acceso con un usuario existente y la descarga de un documento de muestra.
+@H2 10.3 Migración a PostgreSQL
+@P SQLAlchemy permite cambiar el motor cambiando únicamente la variable DATABASE_URL. Los pasos recomendados son:
+@LI Paso 1: instalar PostgreSQL y crear la base de datos docupasion.
+@LI Paso 2: instalar el driver psycopg2: pip install psycopg2-binary.
+@LI Paso 3: configurar DATABASE_URL con el formato postgresql://usuario:clave@localhost:5432/docupasion.
+@LI Paso 4: reiniciar el servidor; SQLAlchemy crea el esquema automáticamente (Base.metadata.create_all).
+@LI Paso 5: exportar los datos de SQLite (dump) e importarlos en PostgreSQL; la compatibilidad es alta porque los modelos usan tipos estándar (Integer, String, DateTime, Boolean, Text).
+@P Riesgo principal: las columnas de tipo texto largo y los campos con espacios (CHECK constraints) deben revisarse; se recomienda una prueba piloto con datos de muestra antes de la migración completa.
+@H2 10.4 Respaldo y restauración
+@LI Respaldo de datos: copiar docupasion.db y uploads/ de forma periódica (diaria si el uso es activo).
+@LI Restauración: detener el servidor, reemplazar la base y la carpeta, y reiniciar.
+@LI Integridad: verificar tras la restauración que el conteo de documentos y la descarga de archivos coinciden.
+@PB
+
+@H1 Conclusiones
+@P La documentación presentada cubre los tres perfiles del sistema: usuario final, administrador y técnico. El Manual de instalación permite reproducir el entorno en cualquier equipo; el Manual de usuario guía los flujos de trabajo diarios; el Manual del administrador describe el monitoreo y la configuración; la Documentación de la API ofrece la referencia completa para integraciones; y el plan de migración prepara la evolución del sistema (cambio de equipo o de motor de base de datos). El circuito de funcionamiento (sección 8) sirve además como guía de demostración para la fase de funcionamiento (FASE 10).
+@PB
+
+@H1 Referencias
+@LI FastAPI. FastAPI Documentation. https://fastapi.tiangolo.com/
+@LI SQLAlchemy. SQLAlchemy 2.0 Documentation. https://docs.sqlalchemy.org/
+@LI pdf.js. Mozilla PDF.js. https://mozilla.github.io/pdf.js/
+@LI pydantic-settings. Documentation. https://docs.pydantic.dev/latest/concepts/pydantic_settings/
+@LI JSON Web Tokens. jwt.io
+@LI Análisis de Requisitos DocuPasion - Documento FASE 1
+@LI Diseño de Arquitectura DocuPasion - Documento FASE 2

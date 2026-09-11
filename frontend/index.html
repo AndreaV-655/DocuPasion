@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuPasion - Sistema Inteligente de Gestión Documental</title>
+    <script src="vendor/lucide.min.js"></script>
+    <script src="vendor/pdf.min.js"></script>
+    <script src="vendor/mammoth.browser.min.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ===== LOGIN / REGISTRO ===== -->
+    <section id="loginView" style="display:none;">
+        <div class="login-card">
+            <div class="login-brand">
+                <i data-lucide="brain-circuit"></i>
+                DocuPasion
+            </div>
+            <p class="login-sub">Sistema Inteligente de Gestión Documental</p>
+
+            <div class="auth-tabs">
+                <div class="auth-tab active" id="tabLogin" onclick="App.showAuth('login')">Iniciar sesión</div>
+                <div class="auth-tab" id="tabRegister" onclick="App.showAuth('register')">Registrarse</div>
+            </div>
+
+            <form id="loginForm" onsubmit="App.login(event)">
+                <div class="field">
+                    <label>Correo electrónico</label>
+                    <input type="email" id="loginEmail" required placeholder="usuario@correo.com">
+                </div>
+                <div class="field">
+                    <label>Contraseña</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••">
+                </div>
+                <div class="auth-error" id="loginError"></div>
+                <button class="btn" type="submit" style="width:100%; justify-content:center;" id="loginBtn">Entrar</button>
+            </form>
+
+            <form id="registerForm" style="display:none;" onsubmit="App.register(event)">
+                <div class="field">
+                    <label>Correo electrónico</label>
+                    <input type="email" id="regEmail" required placeholder="usuario@correo.com">
+                </div>
+                <div class="field">
+                    <label>Contraseña (mínimo 12 caracteres)</label>
+                    <input type="password" id="regPassword" minlength="12" required placeholder="Mínimo 12 caracteres">
+                </div>
+                <div class="auth-error" id="registerError"></div>
+                <button class="btn" type="submit" style="width:100%; justify-content:center;" id="registerBtn">Crear cuenta</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- ===== APP ===== -->
+    <div id="appView" style="display:none;">
+        <aside>
+            <div class="brand">
+                <i data-lucide="brain-circuit"></i>
+                DocuPasion
+            </div>
+            <nav>
+                <button class="nav-item active" onclick="App.switchView('dashboard')"><i data-lucide="layout-dashboard"></i> Dashboard</button>
+                <button class="nav-item" onclick="App.switchView('repositories')"><i data-lucide="folder"></i> Repositorios</button>
+                <button class="nav-item" onclick="App.switchView('documents')"><i data-lucide="file-text"></i> Documentos</button>
+                <button class="nav-item" onclick="App.switchView('chat')"><i data-lucide="message-square"></i> Asistente IA</button>
+                <button class="nav-item admin-only" style="display:none;" onclick="App.switchView('monitoring')"><i data-lucide="activity"></i> Monitoreo</button>
+                <button class="nav-item admin-only" style="display:none;" onclick="App.switchView('config')"><i data-lucide="settings"></i> Configuración</button>
+            </nav>
+            <div class="user-profile">
+                <div class="avatar" id="avatarUser">?</div>
+                <div>
+                    <div style="font-weight:600; font-size:0.9rem;" id="userEmail">-</div>
+                    <span class="role-badge" id="userRole">-</span>
+                </div>
+                <button class="logout-btn" onclick="App.logout()" title="Cerrar sesión"><i data-lucide="log-out" style="width:16px;"></i></button>
+            </div>
+        </aside>
+
+        <main>
+            <!-- Dashboard -->
+            <section id="dashboard" class="view-section active">
+                <header>
+                    <h1>Dashboard General</h1>
+                    <div class="header-actions">
+                        <button class="btn" onclick="App.switchView('documents')"><i data-lucide="plus"></i> Nuevo Documento</button>
+                    </div>
+                </header>
+                <div class="grid-stats">
+                    <div class="card stat-card"><h3>Total Documentos</h3><div class="value" id="stat-total">0</div></div>
+                    <div class="card stat-card"><h3>Procesados por IA</h3><div class="value" id="stat-processed">0</div></div>
+                    <div class="card stat-card"><h3>En procesamiento</h3><div class="value" id="stat-processing">0</div></div>
+                    <div class="card stat-card"><h3>Fallidos</h3><div class="value" id="stat-failed">0</div></div>
+                    <div class="card stat-card"><h3>Preguntas Respondidas</h3><div class="value" id="stat-questions">0</div></div>
+                    <div class="card stat-card"><h3>Ahorro de Tiempo (Est.)</h3><div class="value" id="stat-time">0h</div></div>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:1.5rem;">
+                    <div class="card">
+                        <h3 style="margin-bottom:0.75rem;">Distribución por Estado</h3>
+                        <div id="byStatusChart"></div>
+                    </div>
+                    <div class="card">
+                        <h3 style="margin-bottom:0.75rem;">Distribución por Categoría</h3>
+                        <div id="byCategoryChart"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Repositorios -->
+            <section id="repositories" class="view-section">
+                <header>
+                    <h1>Repositorios</h1>
+                    <div class="header-actions">
+                        <button class="btn" onclick="App.openRepoModal()"><i data-lucide="folder-plus"></i> Nuevo Repositorio</button>
+                    </div>
+                </header>
+                <div class="repo-grid" id="repoGrid"></div>
+            </section>
+
+            <!-- Documentos -->
+            <section id="documents" class="view-section">
+                <header>
+                    <h1>Gestión de Documentos</h1>
+                    <div class="header-actions">
+                        <select id="uploadRepoSelect"><option value="">Sin repositorio</option></select>
+                        <button class="btn" onclick="document.getElementById('fileInput').click()"><i data-lucide="upload-cloud"></i> Subir Archivo</button>
+                    </div>
+                </header>
+
+                <div class="upload-zone" id="dropZone">
+                    <i data-lucide="upload-cloud" style="width:48px; height:48px; color:var(--primary); margin-bottom:0.75rem;"></i>
+                    <h3 style="margin-bottom:0.5rem;">Arrastra y suelta tu archivo aquí</h3>
+                    <p style="color:var(--text-muted); margin-bottom:1rem;">Soporta PDF, DOCX y TXT (máx. 10 MB)</p>
+                    <input type="file" id="fileInput" hidden accept=".pdf,.txt,.docx">
+                    <button class="btn" onclick="document.getElementById('fileInput').click()">Seleccionar Archivo</button>
+                    <button class="btn btn-outline" style="margin-left:0.5rem;" id="clearRepoFilterBtn" onclick="App.clearRepoFilter()">Ver todos</button>
+                </div>
+
+                <div class="filters">
+                    <div class="field"><label>Filtrar por repositorio</label><select id="filterRepo"><option value="">Todos</option></select></div>
+                    <div class="field"><label>Filtrar por categoría</label><select id="filterCategory"><option value="">Todas</option></select></div>
+                    <div class="field"><label>Filtrar por estado</label><select id="filterStatus"><option value="">Todos</option><option value="processing">Procesando</option><option value="indexed">Indexado</option><option value="failed">Fallido</option></select></div>
+                    <div class="field" style="flex:1; min-width:200px;"><label>Buscar por nombre</label><input type="text" id="searchInput" placeholder="Escribe para buscar..."></div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Nombre del Archivo</th><th>Repositorio</th><th>Categoría</th><th>Tamaño</th><th>Estado</th><th>Subido</th><th style="text-align:right;">Acciones</th></tr>
+                        </thead>
+                        <tbody id="documentsTableBody">
+                            <tr><td colspan="7" class="empty-state">Cargando documentos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Chat RAG -->
+            <section id="chat" class="view-section">
+                <header><h1>Asistente de Investigación (RAG)</h1></header>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages"></div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chatInput" placeholder="Ej: resume los puntos clave del documento de tesis..." onkeypress="if(event.key==='Enter') App.sendChat()">
+                        <button class="btn" onclick="App.sendChat()"><i data-lucide="send"></i></button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Monitoreo (admin) -->
+            <section id="monitoring" class="view-section">
+                <header><h1>Monitoreo del Procesamiento</h1></header>
+                <div class="card" style="margin-bottom:1.5rem;">
+                    <h3 style="margin-bottom:0.75rem;">Estados globales de documentos</h3>
+                    <div id="monitorCounts"></div>
+                </div>
+                <div class="card" style="margin-bottom:1.5rem;">
+                    <h3 style="margin-bottom:0.75rem;">Registros de errores</h3>
+                    <div class="table-container" style="box-shadow:none;">
+                        <table>
+                            <thead><tr><th>ID</th><th>Documento</th><th>Código</th><th>Mensaje</th><th>Nivel</th><th>Fecha</th></tr></thead>
+                            <tbody id="errorLogsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 style="margin-bottom:0.75rem;">Registros de operaciones de IA</h3>
+                    <div class="table-container" style="box-shadow:none;">
+                        <table>
+                            <thead><tr><th>ID</th><th>Documento</th><th>Operación</th><th>Tokens</th><th>Tiempo (ms)</th><th>Fecha</th></tr></thead>
+                            <tbody id="aiLogsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Configuración (admin) -->
+            <section id="config" class="view-section">
+                <header><h1>Configuración del Sistema</h1></header>
+                <form class="card" style="max-width:560px;" onsubmit="App.saveConfig(event)">
+                    <div class="field">
+                        <label>Modelo LLM (generación)</label>
+                        <input type="text" id="cfgModel" placeholder="gpt-4o-mini">
+                    </div>
+                    <div class="field">
+                        <label>Tamaño del chunk (tokens)</label>
+                        <input type="number" id="cfgChunkSize" min="1" max="8192">
+                    </div>
+                    <div class="field">
+                        <label>Solapamiento del chunk (tokens)</label>
+                        <input type="number" id="cfgChunkOverlap" min="0" max="1024">
+                    </div>
+                    <div class="field" id="cfgOpenAiHost">
+                        <label>Estado de la API de OpenAI</label>
+                        <div style="font-size:0.9rem;">La clave se gestiona solo por variable de entorno (.env); nunca se expone en la interfaz.</div>
+                    </div>
+                    <button class="btn" type="submit" id="cfgSaveBtn">Guardar configuración</button>
+                </form>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal detalle de documento -->
+    <div class="modal-backdrop" id="detailModal">
+        <div class="modal">
+            <button class="modal-close" onclick="App.closeDetail()">&times;</button>
+            <h3 id="detailTitle">Documento</h3>
+            <div class="detail-grid" id="detailMeta"></div>
+            <div class="pdf-tools" id="pdfTools" style="display:none;">
+                <button class="btn btn-sm" onclick="App.pdfPrev()"><i data-lucide="chevron-left"></i></button>
+                <span id="pdfPageLabel">Página 1</span>
+                <button class="btn btn-sm" onclick="App.pdfNext()"><i data-lucide="chevron-right"></i></button>
+                <button class="btn btn-sm btn-outline" onclick="App.closePdf()">Cerrar visor</button>
+            </div>
+            <div id="pdfContainer" style="display:none;"></div>
+            <div class="detail-block" style="margin-bottom:1rem;">
+                <h4>Resumen generado por IA</h4>
+                <div class="value" id="detailSummary">-</div>
+            </div>
+            <div class="detail-block" style="margin-bottom:1rem;">
+                <h4>Información extraída</h4>
+                <div class="table-container" style="box-shadow:none;">
+                    <table class="extraction-table">
+                        <thead><tr><th>Campo</th><th>Valor</th></tr></thead>
+                        <tbody id="detailExtractions"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="detail-block">
+                <h4>Vista previa del texto</h4>
+                <div class="value" id="detailPreview" style="white-space:pre-wrap; max-height:240px; overflow-y:auto;">-</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal repositorio -->
+    <div class="modal-backdrop" id="repoModal">
+        <div class="modal" style="max-width:420px;">
+            <button class="modal-close" onclick="App.closeRepoModal()">&times;</button>
+            <h3 id="repoModalTitle">Nuevo repositorio</h3>
+            <form onsubmit="App.submitRepo(event)">
+                <input type="hidden" id="repoId">
+                <div class="field">
+                    <label>Nombre</label>
+                    <input type="text" id="repoName" required maxlength="120" placeholder="Ej. Tesis, Legales, Manuales">
+                </div>
+                <div class="auth-error" id="repoError"></div>
+                <button class="btn" type="submit" style="width:100%; justify-content:center;">Guardar</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
+    </script>
+</body>
+</html>

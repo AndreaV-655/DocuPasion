@@ -1,0 +1,25 @@
+# Entorno y secretos
+.env
+*.env
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Base de datos
+*.db
+*.sqlite3
+
+# Subidas
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

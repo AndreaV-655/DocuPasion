@@ -120,10 +120,38 @@
                 <div class="repo-grid" id="repoGrid"></div>
             </section>
 
+            <!-- Documentos del Repositorio -->
+            <section id="repoView" class="view-section">
+                <header>
+                    <div style="display:flex; align-items:center; gap:0.75rem;">
+                        <button class="icon-btn" onclick="App.switchView('repositories')" title="Volver a repositorios"><i data-lucide="arrow-left"></i></button>
+                        <h1 id="repoViewTitle">Repositorio</h1>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn" onclick="document.getElementById('fileInput').click()"><i data-lucide="upload-cloud"></i> Subir Archivo</button>
+                    </div>
+                </header>
+
+                <div class="filters">
+                    <div class="field"><label>Filtrar por categoría</label><select id="filterRepoCategory"><option value="">Todas</option></select></div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Nombre del Archivo</th><th>Categoría</th><th>Tamaño</th><th>Estado</th><th>Subido</th><th style="text-align:right;">Acciones</th></tr>
+                        </thead>
+                        <tbody id="repoDocumentsBody">
+                            <tr><td colspan="6" class="empty-state">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- Documentos -->
             <section id="documents" class="view-section">
                 <header>
-                    <h1>Gestión de Documentos</h1>
+                    <h1 id="documentsTitle">Gestión de Documentos</h1>
                     <div class="header-actions">
                         <select id="uploadRepoSelect"><option value="">Sin repositorio</option></select>
                         <button class="btn" onclick="document.getElementById('fileInput').click()"><i data-lucide="upload-cloud"></i> Subir Archivo</button>
@@ -134,7 +162,7 @@
                     <i data-lucide="upload-cloud" style="width:48px; height:48px; color:var(--primary); margin-bottom:0.75rem;"></i>
                     <h3 style="margin-bottom:0.5rem;">Arrastra y suelta tu archivo aquí</h3>
                     <p style="color:var(--text-muted); margin-bottom:1rem;">Soporta PDF, DOCX y TXT (máx. 10 MB)</p>
-                    <input type="file" id="fileInput" hidden accept=".pdf,.txt,.docx">
+                    <input type="file" id="fileInput" hidden accept=".pdf,.txt,.docx" multiple>
                     <button class="btn" onclick="document.getElementById('fileInput').click()">Seleccionar Archivo</button>
                     <button class="btn btn-outline" style="margin-left:0.5rem;" id="clearRepoFilterBtn" onclick="App.clearRepoFilter()">Ver todos</button>
                 </div>
@@ -161,6 +189,10 @@
             <!-- Chat RAG -->
             <section id="chat" class="view-section">
                 <header><h1>Asistente de Investigación (RAG)</h1></header>
+                <div class="filters" style="margin-bottom:0.75rem;">
+                    <div class="field"><label>Buscar en repositorio</label><select id="chatRepoSelect"><option value="">Todos</option></select></div>
+                    <div class="field"><label>Buscar en categoría</label><select id="chatCategorySelect"><option value="">Todas</option></select></div>
+                </div>
                 <div class="chat-container">
                     <div class="chat-messages" id="chatMessages"></div>
                     <div class="chat-input-area">

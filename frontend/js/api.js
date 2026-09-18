@@ -37,14 +37,27 @@ function _seed(db) {
     if (!db.users || !db.users.length) {
         db.users = [{ id: 1, email: 'admin@docupasion.com', passwordHash: String(_hash('Admin123456!')), role: 'admin', createdAt: new Date().toISOString() }];
     }
+    var ALL_CATEGORIES = [
+        { id: 1, name: 'académico', description: 'Documentos académicos e investigativos', isDefault: false },
+        { id: 2, name: 'técnico', description: 'Documentos técnicos y de ingeniería', isDefault: false },
+        { id: 3, name: 'legal', description: 'Documentos con valor legal o contractual', isDefault: false },
+        { id: 4, name: 'administrativo', description: 'Documentos de gestión y administración', isDefault: false },
+        { id: 5, name: 'general', description: 'Categoría por defecto', isDefault: true },
+        { id: 6, name: 'contratos', description: 'Contratos y convenios (subcategoría de legal)', isDefault: false },
+        { id: 7, name: 'hoja de vida', description: 'Hojas de vida y currículos (subcategoría de administrativo)', isDefault: false },
+    ];
     if (!db.categories || !db.categories.length) {
-        db.categories = [
-            { id: 1, name: 'académico', description: 'Documentos académicos e investigativos', isDefault: false },
-            { id: 2, name: 'técnico', description: 'Documentos técnicos y de ingeniería', isDefault: false },
-            { id: 3, name: 'legal', description: 'Documentos con valor legal o contractual', isDefault: false },
-            { id: 4, name: 'administrativo', description: 'Documentos de gestión y administración', isDefault: false },
-            { id: 5, name: 'general', description: 'Categoría por defecto', isDefault: true },
-        ];
+        db.categories = ALL_CATEGORIES.map(function (c) { return Object.assign({}, c); });
+    } else {
+        var _maxCatId = db.categories.reduce(function (m, c) { return Math.max(m, c.id || 0); }, 0);
+        var _addedCat = false;
+        ALL_CATEGORIES.forEach(function (c) {
+            if (!db.categories.some(function (x) { return x.name === c.name; })) {
+                db.categories.push({ id: ++_maxCatId, name: c.name, description: c.description, isDefault: c.isDefault });
+                _addedCat = true;
+            }
+        });
+        if (_addedCat) { db._seq = db._seq || {}; db._seq.categories = db.categories.length; }
     }
     if (!db.repositories) db.repositories = [];
     if (!db.documents) db.documents = [];
@@ -145,12 +158,18 @@ var _CAT_KW = {
     'técnico': ['software','código','arquitectura','base de datos','servidor','api','endpoints','deployment','docker','aws','cloud','implementación','framework','backend','frontend','programación','algoritmo','requisitos','modelo'],
     'legal': ['contrato','cláusula','ley','reglamento','norma','jurídico','firma','obligación','derecho','tribunal','demanda','resolución','decreto','arbitraje'],
     'administrativo': ['acta','reunión','comité','planificación','presupuesto','inventario','informe','reporte','directriz','estrategia','gestión','calidad','auditoría','protocolo'],
+    'contratos': ['contrato','convenio','cláusula','partes','vigencia','términos y condiciones','acuerdo de confidencialidad','indemnización','obligaciones de las partes','objeto del contrato','duración','terminación','firma de','anexo','penalidades','renovación','prestación de servicios','acuerdo de licencia'],
+    'hoja de vida': ['hoja de vida','currículum','curriculum vitae','perfil profesional','experiencia laboral','formación académica','educación','habilidades','competencias','referencias','logros','resumen profesional','aspiraciones salariales'],
 };
+// Subcategorías: una categoría de mayor jerarquía incluye a sus subcategorías
+var _CAT_SUB = { 'legal': ['contratos'], 'administrativo': ['hoja de vida'] };
 var _CAT_EXTRACT = {
     'académico': ['autor','tesis','director','institución','universidad','palabras clave','resumen'],
     'técnico': ['requisitos','arquitectura','tecnologías','stack','framework','base de datos','despliegue'],
     'legal': ['partes','firmante','contrato','cláusula','vigencia','jurisdicción'],
     'administrativo': ['comité','asistentes','acuerdos','compromisos','fecha','presupuesto','responsable','plazo'],
+    'contratos': ['partes','cláusula','objeto','vigencia','duración','fecha de firma'],
+    'hoja de vida': ['nombre','email','perfil profesional','experiencia laboral','formación académica'],
 };
 
 function _norm(s) {
@@ -166,6 +185,9 @@ function _classify(filename, text) {
     }
     var best = 'general', bestS = 0;
     for (var c in scores) { if (scores[c] > bestS) { bestS = scores[c]; best = c; } }
+    // Las subcategorías son más específicas que su categoría madre
+    if (scores['contratos'] >= 2 && scores['contratos'] >= scores['legal']) return 'contratos';
+    if (scores['hoja de vida'] >= 2 && scores['hoja de vida'] >= scores['administrativo']) return 'hoja de vida';
     return bestS > 2 ? best : 'general';
 }
 
@@ -207,6 +229,18 @@ function _extractFields(text, type) {
     } else if (type === 'administrativo') {
         fields.push({ field_name: 'asistentes', field_value: findLine(/asistentes/i) });
         fields.push({ field_name: 'acuerdos', field_value: findLine(/acuerdos|compromisos/i) });
+        fields.push({ field_name: 'fechas', field_value: years.join(', ') });
+    } else if (type === 'contratos') {
+        fields.push({ field_name: 'partes', field_value: findLine(/partes|entre|contrato/i) });
+        fields.push({ field_name: 'objeto', field_value: findLine(/objeto del contrato|objeto/i) });
+        fields.push({ field_name: 'cláusulas', field_value: findLine(/cláusula/i) });
+        fields.push({ field_name: 'vigencia', field_value: findLine(/vigencia/i) });
+        fields.push({ field_name: 'fechas', field_value: years.join(', ') });
+    } else if (type === 'hoja de vida') {
+        fields.push({ field_name: 'email', field_value: emails.join(', ') });
+        fields.push({ field_name: 'perfil profesional', field_value: findLine(/perfil profesional/i) });
+        fields.push({ field_name: 'experiencia laboral', field_value: findLine(/experiencia laboral/i) });
+        fields.push({ field_name: 'formación académica', field_value: findLine(/formación académica|educación/i) });
         fields.push({ field_name: 'fechas', field_value: years.join(', ') });
     }
     return fields.filter(function (f) { return f.field_value; });
@@ -382,7 +416,17 @@ async function _route(method, path, body) {
         if (!body || !body._user) throw new APIError('No autenticado', 401);
         var msg = _norm(body.message || '');
         var start = Date.now();
-        var q = db.documents.filter(function (d) { return d.ownerId === body._user.id && d.status === 'indexed' && d.extractedText; });
+        var repF = body.repository_id ? parseInt(body.repository_id, 10) : null;
+        var catF = body.category ? _norm(body.category) : '';
+        var q = db.documents.filter(function (d) {
+            if (d.ownerId !== body._user.id || d.status !== 'indexed' || !d.extractedText) return false;
+            if (repF && d.repositoryId !== repF) return false;
+            if (catF) {
+                var c = db.categories.find(function (x) { return x.id === d.categoryId; });
+                if (!c || (_norm(c.name) !== catF && (_CAT_SUB[catF] || []).indexOf(_norm(c.name)) === -1)) return false;
+            }
+            return true;
+        });
         var hits = [];
         q.forEach(function (d) {
             var t = _norm(d.extractedText), idx = t.indexOf(msg);
@@ -394,7 +438,7 @@ async function _route(method, path, body) {
         var elapsed = Date.now() - start;
         db.aiLogs.push({ id: _nextId(db, 'aiLogs'), documentId: null, ownerId: body._user.id, operationType: 'chat', tokensUsed: 0, processingTimeMs: elapsed, timestamp: new Date().toISOString() });
         _saveDB(db);
-        return { query: body.message, answer: answer, sources: hits.map(function (h) { return { doc_id: h.doc_id, score: h.score, snippet: h.text.slice(0, 240) }; }), chunks_retrieved: hits.length, mode: 'demo', response_time_ms: elapsed };
+        return { query: body.message, answer: answer, sources: hits.map(function (h) { return { doc_id: h.doc_id, score: h.score, snippet: h.text.slice(0, 240) }; }), chunks_retrieved: hits.length, mode: 'demo', response_time_ms: elapsed, filters: { repository_id: repF, category: body.category || '' } };
     }
     if (method === 'GET' && _matchSegs(segs, ['api', 'chat', 'search'])) {
         if (!body || !body._user) throw new APIError('No autenticado', 401);

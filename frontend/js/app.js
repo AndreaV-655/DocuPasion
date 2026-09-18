@@ -1,6 +1,14 @@
 // ===== DocuPasion - Lógica de la aplicación (SPA) =====
 
-const CATEGORY_OPTIONS = ['académico', 'técnico', 'legal', 'administrativo', 'general'];
+const CATEGORY_OPTIONS = ['académico', 'técnico', 'legal', 'contratos', 'administrativo', 'hoja de vida', 'general'];
+const CHAT_TOPICS = [
+    { cat: 'contratos', label: 'Contratos y cláusulas', query: 'cláusula' },
+    { cat: 'legal', label: 'Aspectos legales', query: 'ley' },
+    { cat: 'hoja de vida', label: 'Hoja de vida / CV', query: 'experiencia laboral' },
+    { cat: 'administrativo', label: 'Actas y reuniones', query: 'acta' },
+    { cat: 'académico', label: 'Investigación académica', query: 'metodología' },
+    { cat: 'técnico', label: 'Temas técnicos', query: 'requisitos' },
+];
 const HELPERS = {
     escapeHtml(str = '') {
         return String(str).replace(/[&<>"']/g, (m) => ({
@@ -50,10 +58,10 @@ const App = {
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length) this.uploadFile(e.dataTransfer.files[0]);
+            this._uploadMultiple(e.dataTransfer.files || []);
         });
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length) this.uploadFile(e.target.files[0]);
+            this._uploadMultiple(e.target.files || []);
             e.target.value = '';
         });
 
@@ -64,6 +72,7 @@ const App = {
         });
         document.getElementById('filterRepo').addEventListener('change', (e) => { this.filters.repo = e.target.value; this.loadDocuments(); });
         document.getElementById('filterCategory').addEventListener('change', (e) => { this.filters.category = e.target.value; this.loadDocuments(); });
+        document.getElementById('filterRepoCategory').addEventListener('change', (e) => { this.filters.category = e.target.value; this.loadRepoDocuments(); });
         document.getElementById('filterStatus').addEventListener('change', (e) => { this.filters.status = e.target.value; this.loadDocuments(); });
     },
 
@@ -92,7 +101,12 @@ const App = {
         document.getElementById('avatarUser').textContent = (this.user.email || '?')[0].toUpperCase();
         const isAdmin = this.user.role === 'admin';
         document.querySelectorAll('.admin-only').forEach((el) => { el.style.display = isAdmin ? '' : 'none'; });
-        this.switchView('dashboard');
+        const savedRepo = parseInt(localStorage.getItem('dp_selected_repo'), 10);
+        if (savedRepo) {
+            this.selectedRepoId = savedRepo;
+            this.filters.repo = String(savedRepo);
+        }
+        this.switchView(savedRepo ? 'repoView' : 'dashboard');
         HELPERS.icons();
     },
 
@@ -162,14 +176,15 @@ const App = {
         if (!el) return;
         el.classList.add('active');
         document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
-        const navMap = { dashboard: 0, repositories: 1, documents: 2, chat: 3, monitoring: 4, config: 5 };
+        const navMap = { dashboard: 0, repositories: 1, repoView: 1, documents: 2, chat: 3, monitoring: 4, config: 5 };
         const navItems = document.querySelectorAll('.nav-item');
         if (navItems[navMap[viewId]]) navItems[navMap[viewId]].classList.add('active');
 
         if (viewId === 'dashboard') this.loadDashboard();
         if (viewId === 'repositories') this.loadRepositories();
+        if (viewId === 'repoView') this.loadRepoView();
         if (viewId === 'documents') { this.loadRepositoriesForSelects(); this.loadDocuments(); }
-        if (viewId === 'chat') this.loadChatGreeting();
+        if (viewId === 'chat') { this.loadChatGreeting(); this.loadChatOptions(); this.loadChatTopics(); }
         if (viewId === 'monitoring') this.loadMonitoring();
         if (viewId === 'config') this.loadConfig();
         HELPERS.icons();
@@ -202,6 +217,12 @@ const App = {
     // ===== Repositorios =====
     async loadRepositories() {
         this._repos = await API.get('/api/repositories/').catch(() => []);
+        if (this.selectedRepoId && !this._repos.some((r) => r.id === this.selectedRepoId)) {
+            this.selectedRepoId = null;
+            this.filters.repo = '';
+            localStorage.removeItem('dp_selected_repo');
+        }
+        this.updateRepoViewTitle();
         const repos = this._repos;
         const grid = document.getElementById('repoGrid');
         if (!repos.length) {
@@ -224,12 +245,63 @@ const App = {
     },
 
     selectRepo(id) {
-        this.selectedRepoId = this.selectedRepoId === id ? null : id;
-        this.filters.repo = this.selectedRepoId ? String(id) : '';
+        this.selectedRepoId = id;
+        this.filters.repo = id ? String(id) : '';
+        if (id) localStorage.setItem('dp_selected_repo', String(id));
+        else localStorage.removeItem('dp_selected_repo');
         document.getElementById('filterRepo').value = this.filters.repo;
         this.loadRepositories();
-        this.loadDocuments();
-        this.showToast(this.selectedRepoId ? 'Filtrado por repositorio' : 'Mostrando todos los repositorios', 'info');
+        this.switchView('repoView');
+    },
+
+    updateRepoViewTitle() {
+        const title = document.getElementById('repoViewTitle');
+        const repo = this.selectedRepoId ? this._repos.find((r) => r.id === this.selectedRepoId) : null;
+        title.textContent = repo ? repo.name : 'Repositorio';
+    },
+
+    loadRepoView() {
+        this.loadRepositoriesForSelects();
+        this.loadRepoCategories();
+        this.loadRepoDocuments();
+        this.updateRepoViewTitle();
+    },
+
+    loadRepoCategories() {
+        const sel = document.getElementById('filterRepoCategory');
+        const cur = this.filters.category || sel.value;
+        sel.innerHTML = '<option value="">Todas</option>' + CATEGORY_OPTIONS.map((c) => `<option value="${c}">${c[0].toUpperCase() + c.slice(1)}</option>`).join('');
+        sel.value = cur || '';
+    },
+
+    async loadRepoDocuments() {
+        const tb = document.getElementById('repoDocumentsBody');
+        tb.innerHTML = '<tr><td colspan="6" class="empty-state">Cargando...</td></tr>';
+        if (!this.selectedRepoId) { tb.innerHTML = '<tr><td colspan="6" class="empty-state">No hay repositorio seleccionado.</td></tr>'; return; }
+        const params = new URLSearchParams({ repository_id: String(this.selectedRepoId) });
+        if (this.filters.category) params.set('category', this.filters.category);
+        const docs = await API.get('/api/documents/?' + params.toString()).catch(() => { tb.innerHTML = '<tr><td colspan="6" class="empty-state">Error al cargar documentos</td></tr>'; return null; });
+        if (!docs) return;
+        if (!docs.length) { tb.innerHTML = '<tr><td colspan="6" class="empty-state">No hay documentos en este repositorio.</td></tr>'; return; }
+        tb.innerHTML = docs.map((d) => `
+            <tr>
+                <td>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <i data-lucide="${(d.filename || '').toLowerCase().endsWith('.pdf') ? 'file-text' : 'file'}" style="width:16px; color:var(--secondary);"></i>
+                        <span style="cursor:pointer; color:var(--primary);" onclick="App.openDetail(${d.id})" title="Ver detalle">${HELPERS.escapeHtml(d.filename)}</span>
+                    </div>
+                </td>
+                <td>${HELPERS.escapeHtml(d.category || '-')}</td>
+                <td>${HELPERS.formatBytes(d.file_size)}</td>
+                <td>${HELPERS.badge(d.status)}</td>
+                <td>${HELPERS.formatDate(d.uploaded_at)}</td>
+                <td style="text-align:right; white-space:nowrap;">
+                    <button class="icon-btn" title="Descargar" onclick="App.downloadDoc(${d.id}, '${HELPERS.escapeHtml(d.filename).replace(/'/g, '&#39;')}')"><i data-lucide="download"></i></button>
+                    <button class="icon-btn" title="Ver detalle" onclick="App.openDetail(${d.id})"><i data-lucide="eye"></i></button>
+                    <button class="icon-btn danger" title="Eliminar" onclick="App.deleteDoc(${d.id})"><i data-lucide="trash-2"></i></button>
+                </td>
+            </tr>`).join('');
+        HELPERS.icons();
     },
 
     openRepoModal(id = null) {
@@ -271,12 +343,15 @@ const App = {
     // ===== Documentos =====
     async loadRepositoriesForSelects() {
         const repos = await API.get('/api/repositories/').catch(() => []);
+        this._repos = repos;
         const opts = repos.map((r) => `<option value="${r.id}">${HELPERS.escapeHtml(r.name)}</option>`).join('');
         const sel = document.getElementById('filterRepo');
-        const cur = sel.value;
+        const cur = this.filters.repo || sel.value;
         sel.innerHTML = '<option value="">Todos</option>' + opts;
-        sel.value = cur;
+        sel.value = cur && opts.includes('value="' + cur + '"') ? cur : '';
         document.getElementById('uploadRepoSelect').innerHTML = '<option value="">Sin repositorio</option>' + opts;
+        document.getElementById('uploadRepoSelect').value = this.selectedRepoId ? String(this.selectedRepoId) : '';
+        this.updateRepoViewTitle();
     },
 
     async loadDocuments() {
@@ -324,8 +399,16 @@ const App = {
             const ok = result.detail ? ' al ' + result.detail : '';
             this.showToast(`${file.name}: ${result.status}${ok}`, result.status === 'indexed' ? 'success' : 'error');
             this.loadDocuments();
+            this.loadRepoDocuments();
             this.loadDashboard();
         } catch (err) { this.showToast(err.message, 'error'); }
+    },
+
+    // Sube varios archivos en secuencia para no perder escrituras (RF: subida múltiple)
+    async _uploadMultiple(files) {
+        for (const f of Array.from(files || [])) {
+            await this.uploadFile(f);
+        }
     },
 
     async deleteDoc(id) {
@@ -334,6 +417,7 @@ const App = {
             await API.del('/api/documents/' + id);
             this.showToast('Documento eliminado', 'success');
             this.loadDocuments();
+            this.loadRepoDocuments();
             this.loadDashboard();
         } catch (err) { this.showToast(err.message, 'error'); }
     },
@@ -358,6 +442,8 @@ const App = {
         this.filters.repo = '';
         document.getElementById('filterRepo').value = '';
         document.getElementById('uploadRepoSelect').value = '';
+        localStorage.removeItem('dp_selected_repo');
+        this.updateRepoViewTitle();
         this.loadRepositories();
         this.loadDocuments();
     },
@@ -444,8 +530,44 @@ const App = {
     loadChatGreeting() {
         const container = document.getElementById('chatMessages');
         if (!container.children.length) {
-            container.innerHTML = '<div class="message ai">Hola, soy tu asistente de análisis documental de DocuPasion. Haz preguntas sobre tus documentos indexados; responderé con citas a las fuentes.</div>';
+            container.innerHTML = '<div class="message ai">Hola, soy tu asistente de análisis documental de DocuPasion. Haz preguntas sobre tus documentos indexados; responderé con citas a las fuentes. Si quieres una búsqueda más específica, elige un repositorio y/o una categoría.</div>' +
+                '<div class="chat-topics" id="chatTopics"></div>';
         }
+    },
+
+    async loadChatTopics() {
+        const host = document.getElementById('chatTopics');
+        if (!host) return;
+        const docs = await API.get('/api/documents/').catch(() => []);
+        const present = new Set(docs.map((d) => d.category).filter(Boolean));
+        const topics = CHAT_TOPICS.filter((t) => present.has(t.cat));
+        if (!topics.length) {
+            host.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted);">Sube e indexa documentos para ver aquí temas que puedes buscar.</div>';
+            return;
+        }
+        host.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted); align-self:center;">Temas que puedes buscar:</span>' +
+            topics.map((t) => `<button class="topic-chip" onclick="App.askTopic('${t.cat}','${t.query}')">${HELPERS.escapeHtml(t.label)}</button>`).join('');
+    },
+
+    askTopic(cat, query) {
+        document.getElementById('chatRepoSelect').value = '';
+        document.getElementById('chatCategorySelect').value = cat;
+        const input = document.getElementById('chatInput');
+        input.value = query;
+        this.sendChat();
+    },
+
+    async loadChatOptions() {
+        const repos = await API.get('/api/repositories/').catch(() => []);
+        this._repos = repos;
+        const sel = document.getElementById('chatRepoSelect');
+        const curRepo = sel.value;
+        sel.innerHTML = '<option value="">Todos</option>' + repos.map((r) => `<option value="${r.id}">${HELPERS.escapeHtml(r.name)}</option>`).join('');
+        sel.value = curRepo && repos.some((r) => String(r.id) === curRepo) ? curRepo : '';
+        const selC = document.getElementById('chatCategorySelect');
+        const curCat = selC.value;
+        selC.innerHTML = '<option value="">Todas</option>' + CATEGORY_OPTIONS.map((c) => `<option value="${c}">${c[0].toUpperCase() + c.slice(1)}</option>`).join('');
+        selC.value = curCat && CATEGORY_OPTIONS.includes(curCat) ? curCat : '';
     },
 
     async sendChat() {
@@ -456,17 +578,29 @@ const App = {
         container.insertAdjacentHTML('beforeend', `<div class="message user">${HELPERS.escapeHtml(message)}</div>`);
         input.value = '';
         const loadingId = 'loading-' + Date.now();
+        const scope = (document.getElementById('chatRepoSelect').value || document.getElementById('chatCategorySelect').value);
         container.insertAdjacentHTML('beforeend', `<div class="message ai" id="${loadingId}"><span class="loader dark"></span> Buscando en tu repositorio...</div>`);
         container.scrollTop = container.scrollHeight;
         try {
-            const data = await API.post('/api/chat/', { message });
+            const body = { message };
+            const repoIdSel = document.getElementById('chatRepoSelect').value;
+            const catSel = document.getElementById('chatCategorySelect').value;
+            if (repoIdSel) body.repository_id = repoIdSel;
+            if (catSel) body.category = catSel;
+            const data = await API.post('/api/chat/', body);
             const el = document.getElementById(loadingId);
             if (el) el.remove();
             const mode = data.mode === 'llm' ? 'Generado con LLM' : 'Generado en modo demo local';
+            let scopeNote = '';
+            if (repoIdSel || catSel) {
+                const repoName = repoIdSel ? (this._repos.find((r) => String(r.id) === repoIdSel) || {}).name || repoIdSel : 'todos';
+                const catName = catSel ? catSel[0].toUpperCase() + catSel.slice(1) : 'todas';
+                scopeNote = `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem;">Búsqueda específica en: ${HELPERS.escapeHtml(repoName)} · categoría ${HELPERS.escapeHtml(catName)}</div>`;
+            }
             const sources = (data.sources || []).map((s, i) =>
-                `<span class="source">Fuente ${i + 1}: documento #${s.doc_id} (relevancia ${s.score})<br>${HELPERS.escapeHtml(s.snippet || '')}</span>`).join('');
+                `<span class="source">Fuente ${i + 1}: <a href="#" class="source-link" onclick="App.openDetail(${s.doc_id}); return false;">documento #${s.doc_id}</a> (relevancia ${s.score})<br>${HELPERS.escapeHtml(s.snippet || '')}</span>`).join('');
             container.insertAdjacentHTML('beforeend',
-                `<div class="message ai">${HELPERS.escapeHtml(data.answer || 'El sistema no devolvió respuesta.')}<span class="mode-badge">${mode} · ${data.response_time_ms}ms</span>${sources}</div>`);
+                `<div class="message ai">${HELPERS.escapeHtml(data.answer || 'El sistema no devolvió respuesta.')}<span class="mode-badge">${mode} · ${data.response_time_ms}ms</span>${scopeNote}${sources}</div>`);
         } catch (err) {
             const el = document.getElementById(loadingId);
             if (el) el.remove();

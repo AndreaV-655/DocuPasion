@@ -1,4 +1,4 @@
-const CACHE = 'docupasion-v2';
+const CACHE = 'docupasion-v11';
 const ASSETS = [
     './',
     'index.html',

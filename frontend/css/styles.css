@@ -122,7 +122,7 @@ aside {
     padding-top: 1rem;
     border-top: 1px solid var(--border);
 }
-.avatar { width: 40px; height: 40px; border-radius: 50%; background-color: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+.avatar { width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; background-color: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; }
 .role-badge { display: inline-block; background: var(--primary-light); color: var(--primary-dark); border-radius: 8px; padding: 0.1rem 0.5rem; font-size: 0.7rem; font-weight: 600; text-transform: capitalize; }
 .logout-btn { margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem 0.6rem; cursor: pointer; color: var(--text-muted); }
 

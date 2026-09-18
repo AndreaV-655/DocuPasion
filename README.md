@@ -4,7 +4,7 @@ Sistema Inteligente de Gestion Documental con IA (RAG). Sube documentos (PDF, TX
 
 ## Como arrancar (version JS, sin servidor)
 
-1. Abre `frontend\index.html` en tu navegador (doble clic). No se necesita servidor, Python ni internet.
+1. Abre `frontend\index.html` en tu navegador (doble clic). 
 2. Usuario administrador inicial: `admin@docupasion.com` / `Admin123456!`
 
 Todo corre en el navegador:
